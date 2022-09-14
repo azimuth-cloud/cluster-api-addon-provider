@@ -5,7 +5,6 @@ import typing as t
 
 from pydantic import Field, AnyHttpUrl, constr
 
-from easykube import resources as k8s
 from easykube.kubernetes.client import AsyncClient
 
 from kube_custom_resource import schema
@@ -79,9 +78,11 @@ class HelmValuesConfigMapSource(schema.BaseModel):
         ek_client: AsyncClient,
         addon: HelmReleaseType,
         cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any]
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ) -> t.Dict[str, t.Any]:
-        configmap = await k8s.ConfigMap(ek_client).fetch(
+        resource = await ek_client.api("v1").resource("configmaps")
+        configmap = await resource.fetch(
             self.config_map.name,
             namespace = addon.metadata.namespace
         )
@@ -89,7 +90,8 @@ class HelmValuesConfigMapSource(schema.BaseModel):
             configmap.data[self.config_map.key],
             addon = addon,
             cluster = cluster,
-            infra_cluster = infra_cluster
+            infra_cluster = infra_cluster,
+            cloud_identity = cloud_identity
         )
 
 
@@ -112,9 +114,11 @@ class HelmValuesSecretSource(schema.BaseModel):
         ek_client: AsyncClient,
         addon: HelmReleaseType,
         cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any]
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ) -> t.Dict[str, t.Any]:
-        secret = await k8s.Secret(ek_client).fetch(
+        resource = await ek_client.api("v1").resource("secrets")
+        secret = await resource.fetch(
             self.secret.name,
             namespace = addon.metadata.namespace
         )
@@ -122,7 +126,8 @@ class HelmValuesSecretSource(schema.BaseModel):
             base64.b64decode(secret.data[self.secret.key]),
             addon = addon,
             cluster = cluster,
-            infra_cluster = infra_cluster
+            infra_cluster = infra_cluster,
+            cloud_identity = cloud_identity
         )
 
 
@@ -145,13 +150,15 @@ class HelmValuesTemplateSource(schema.BaseModel):
         ek_client: AsyncClient,
         addon: HelmReleaseType,
         cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any]
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ) -> t.Dict[str, t.Any]:
         return template_loader.yaml_string(
             self.template,
             addon = addon,
             cluster = cluster,
-            infra_cluster = infra_cluster
+            infra_cluster = infra_cluster,
+            cloud_identity = cloud_identity
         )
 
 
@@ -227,7 +234,8 @@ class HelmRelease(
         ek_client: AsyncClient,
         helm_client: Client,
         cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any]
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ) -> contextlib.AbstractAsyncContextManager[pathlib.Path]:
         return helm_client.pull_chart(
             self.spec.chart.name,
@@ -240,7 +248,8 @@ class HelmRelease(
         template_loader: Loader,
         ek_client: AsyncClient,
         cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any]
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ) -> t.Dict[str, t.Any]:
         # Compose the values from the specified sources
         values = {}
@@ -252,7 +261,8 @@ class HelmRelease(
                     ek_client,
                     self,
                     cluster,
-                    infra_cluster
+                    infra_cluster,
+                    cloud_identity
                 )
             )
         return values

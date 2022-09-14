@@ -3,7 +3,6 @@ import typing as t
 
 from pydantic import Field, constr
 
-from easykube import resources as k8s
 from easykube.kubernetes.client import AsyncClient
 
 from kube_custom_resource import schema
@@ -58,6 +57,32 @@ class ManifestConfigMapSource(schema.BaseModel):
         description = "The details of a configmap and keys to use."
     )
 
+    async def get_resources(
+        self,
+        template_loader: Loader,
+        ek_client: AsyncClient,
+        addon: ManifestsType,
+        cluster: t.Dict[str, t.Any],
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
+    ) -> t.Iterable[t.Dict[str, t.Any]]:
+        resource = await ek_client.api("v1").resource("configmaps")
+        configmap = await resource.fetch(
+            self.config_map.name,
+            namespace = addon.metadata.namespace
+        )
+        return (
+            resource
+            for key in self.config_map.filter_keys(configmap.data.keys())
+            for resource in template_loader.yaml_string_all(
+                configmap.data[key],
+                addon = addon,
+                cluster = cluster,
+                infra_cluster = infra_cluster,
+                cloud_identity = cloud_identity
+            )
+        )
+
 
 class ManifestSecretSource(schema.BaseModel):
     """
@@ -77,21 +102,23 @@ class ManifestSecretSource(schema.BaseModel):
         ek_client: AsyncClient,
         addon: ManifestsType,
         cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any]
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ) -> t.Iterable[t.Dict[str, t.Any]]:
-        secret = await k8s.Secret(ek_client).fetch(
+        resource = await ek_client.api("v1").resource("secrets")
+        secret = await resource.fetch(
             self.secret.name,
             namespace = addon.metadata.namespace
         )
-        keys = self.secret.filter_keys(secret.data.keys())
         return (
             resource
-            for key in keys
+            for key in self.secret.filter_keys(secret.data.keys())
             for resource in template_loader.yaml_string_all(
                 base64.b64decode(secret.data[key]).decode(),
                 addon = addon,
                 cluster = cluster,
-                infra_cluster = infra_cluster
+                infra_cluster = infra_cluster,
+                cloud_identity = cloud_identity
             )
         )
 
@@ -107,6 +134,26 @@ class ManifestTemplateSource(schema.BaseModel):
         ...,
         description = "The template to use to render the manifests."
     )
+
+    async def get_resources(
+        self,
+        template_loader: Loader,
+        ek_client: AsyncClient,
+        addon: ManifestsType,
+        cluster: t.Dict[str, t.Any],
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
+    ) -> t.Iterable[t.Dict[str, t.Any]]:
+        return (
+            resource
+            for resource in template_loader.yaml_string_all(
+                self.template,
+                addon = addon,
+                cluster = cluster,
+                infra_cluster = infra_cluster,
+                cloud_identity = cloud_identity
+            )
+        )
 
 
 ManifestSource = schema.StructuralUnion[
@@ -167,7 +214,8 @@ class Manifests(
         template_loader: Loader,
         ek_client: AsyncClient,
         cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any]
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ) -> t.Iterable[t.Dict[str, t.Any]]:
         """
         Returns the resources to use to build the ephemeral chart.
@@ -178,6 +226,7 @@ class Manifests(
                 ek_client,
                 self,
                 cluster,
-                infra_cluster
+                infra_cluster,
+                cloud_identity
             ):
                 yield resource

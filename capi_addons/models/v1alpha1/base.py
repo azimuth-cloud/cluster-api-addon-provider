@@ -207,7 +207,9 @@ class Addon(CustomResource, abstract = True):
         # The Cluster API cluster object
         cluster: typing.Dict[str, typing.Any],
         # The Cluster API infrastructure cluster object
-        infra_cluster: typing.Dict[str, typing.Any]
+        infra_cluster: typing.Dict[str, typing.Any],
+        # The cloud identity object, if one exists
+        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]]
     ) -> contextlib.AbstractAsyncContextManager[Chart]:
         """
         Context manager that yields the chart for this addon.
@@ -223,7 +225,9 @@ class Addon(CustomResource, abstract = True):
         # The Cluster API cluster object
         cluster: typing.Dict[str, typing.Any],
         # The Cluster API infrastructure cluster object
-        infra_cluster: typing.Dict[str, typing.Any]
+        infra_cluster: typing.Dict[str, typing.Any],
+        # The cloud identity object, if one exists
+        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]]
     ) -> typing.Dict[str, typing.Any]:
         """
         Returns the values to use with the release.
@@ -316,7 +320,9 @@ class Addon(CustomResource, abstract = True):
         # The Cluster API cluster object
         cluster: typing.Dict[str, typing.Any],
         # The Cluster API infrastructure cluster object
-        infra_cluster: typing.Dict[str, typing.Any]
+        infra_cluster: typing.Dict[str, typing.Any],
+        # The cloud identity object, if one exists
+        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]]
     ):
         """
         Install or upgrade this addon on the target cluster.
@@ -331,14 +337,16 @@ class Addon(CustomResource, abstract = True):
             ek_client_management,
             helm_client,
             cluster,
-            infra_cluster
+            infra_cluster,
+            cloud_identity
         )
         async with chart_context as chart:
             values = await self.get_values(
                 template_loader,
                 ek_client_management,
                 cluster,
-                infra_cluster
+                infra_cluster,
+                cloud_identity
             )
             should_install_or_upgrade = await self._should_install_or_upgrade(
                 current_revision,
@@ -417,7 +425,8 @@ class EphemeralChartAddon(Addon, abstract = True):
         template_loader: Loader,
         ek_client: AsyncClient,
         cluster: typing.Dict[str, typing.Any],
-        infra_cluster: typing.Dict[str, typing.Any]
+        infra_cluster: typing.Dict[str, typing.Any],
+        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]]
     ) -> typing.Iterable[typing.Dict[str, typing.Any]]:
         """
         Returns the resources to use to build the ephemeral chart.
@@ -431,7 +440,8 @@ class EphemeralChartAddon(Addon, abstract = True):
         ek_client: AsyncClient,
         helm_client: Client,
         cluster: typing.Dict[str, typing.Any],
-        infra_cluster: typing.Dict[str, typing.Any]
+        infra_cluster: typing.Dict[str, typing.Any],
+        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]]
     ) -> contextlib.AbstractAsyncContextManager[Chart]:
         # Write the files for the ephemeral chart
         with tempfile.TemporaryDirectory() as chart_directory:
@@ -458,7 +468,8 @@ class EphemeralChartAddon(Addon, abstract = True):
                 template_loader,
                 ek_client,
                 cluster,
-                infra_cluster
+                infra_cluster,
+                cloud_identity
             ):
                 filename = "{}_{}_{}_{}.yaml".format(
                     resource["apiVersion"].replace("/", "_"),

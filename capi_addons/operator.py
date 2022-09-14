@@ -125,6 +125,14 @@ async def clients_for_cluster(kubeconfig_secret):
             yield (ek_client_target, helm_client)
 
 
+async def fetch_ref(ref, default_namespace):
+    """
+    Returns the object that is referred to by a ref.
+    """
+    resource = await ek_client.api(ref.get("apiVersion", "v1")).resource(ref["kind"])
+    return await resource.fetch(ref["name"], namespace = ref.get("namespace", default_namespace))
+
+
 @addon_handler(kopf.on.create)
 # Run when the annotations are updated as well as the spec
 # This allows the use of checksum annotations to trigger a reinstall when the content
@@ -164,9 +172,17 @@ async def handle_addon_updated(addon, **kwargs):
         if not ready:
             raise kopf.TemporaryError(f"cluster '{addon.spec.cluster_name}' is not ready")
         # Get the infra cluster for the CAPI cluster
-        ref = cluster.spec["infrastructureRef"]
-        resource = await ek_client.api(ref["apiVersion"]).resource(ref["kind"])
-        infra_cluster = await resource.fetch(ref["name"], namespace = ref["namespace"])
+        infra_cluster = await fetch_ref(
+            cluster.spec["infrastructureRef"],
+            cluster.metadata.namespace
+        )
+        # Get the cloud identity for the cluster, if it exists
+        # It is made available to templates in case they need to configure access to the host cloud
+        id_ref = infra_cluster.spec.get("identityRef")
+        if id_ref:
+            cloud_identity = await fetch_ref(id_ref, cluster.metadata.namespace)
+        else:
+            cloud_identity = None
         # The kubeconfig for the cluster is in a secret
         secret = await k8s.Secret(ek_client).fetch(
             f"{cluster.metadata.name}-kubeconfig",
@@ -180,7 +196,8 @@ async def handle_addon_updated(addon, **kwargs):
                 ek_client_target,
                 helm_client,
                 cluster,
-                infra_cluster
+                infra_cluster,
+                cloud_identity
             )
     # Handle expected errors by converting them to kopf errors
     # This suppresses the stack trace in logs/events
