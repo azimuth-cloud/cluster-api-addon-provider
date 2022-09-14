@@ -1,0 +1,29 @@
+apiVersion: addons.stackhpc.com/v1alpha1
+kind: HelmRelease
+metadata:
+  name: example-openstack-ccm
+spec:
+  clusterName: example
+  bootstrap: true
+  chart:
+    repo: https://kubernetes.github.io/cloud-provider-openstack
+    name: openstack-cloud-controller-manager
+    version: 1.3.0
+  targetNamespace: openstack-system
+  releaseName: openstack-ccm
+  valuesSources:
+    - template: |
+        secret:
+          create: false
+        cluster:
+          name: {{ cluster.metadata.name }}
+        nodeSelector:
+          node-role.kubernetes.io/control-plane: ""
+        tolerations:
+          - key: node.cloudprovider.kubernetes.io/uninitialized
+            value: "true"
+            effect: NoSchedule
+          - key: node-role.kubernetes.io/master
+            effect: NoSchedule
+          - key: node-role.kubernetes.io/control-plane
+            effect: NoSchedule

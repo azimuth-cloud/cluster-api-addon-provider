@@ -1,0 +1,174 @@
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: example
+spec:
+  clusterNetwork: 
+    pods:
+      cidrBlocks:
+      - 172.16.0.0/13
+    serviceDomain: cluster.local
+    services:
+      cidrBlocks:
+      - 172.24.0.0/13
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: example-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha5
+    kind: OpenStackCluster
+    name: example
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfigTemplate
+metadata:
+  name: example-md-0
+spec:
+  template:
+    spec: 
+      joinConfiguration:
+        nodeRegistration:
+          kubeletExtraArgs:
+            cloud-provider: external
+          name: '{{ local_hostname }}'
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: example-control-plane
+spec:
+  version: 1.24.2
+  replicas: 3
+  rolloutStrategy: 
+    rollingUpdate:
+      maxSurge: 1
+    type: RollingUpdate
+  machineTemplate:
+    infrastructureRef:
+      kind: OpenStackMachineTemplate
+      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha5
+      name: example-control-plane
+    nodeDrainTimeout: 5m
+  kubeadmConfigSpec: 
+    clusterConfiguration:
+      apiServer:
+        extraArgs:
+          cloud-provider: external
+      controllerManager:
+        extraArgs:
+          bind-address: 0.0.0.0
+          cloud-provider: external
+      etcd:
+        local:
+          extraArgs:
+            listen-metrics-urls: http://0.0.0.0:2381
+      scheduler:
+        extraArgs:
+          bind-address: 0.0.0.0
+    initConfiguration:
+      nodeRegistration:
+        kubeletExtraArgs:
+          cloud-provider: external
+        name: '{{ local_hostname }}'
+    joinConfiguration:
+      nodeRegistration:
+        kubeletExtraArgs:
+          cloud-provider: external
+        name: '{{ local_hostname }}'
+    files:
+      - content: |
+          ---
+          apiVersion: kubeproxy.config.k8s.io/v1alpha1
+          kind: KubeProxyConfiguration
+          metricsBindAddress: 0.0.0.0:10249
+        owner: root:root
+        path: /run/kubeadm/kube-proxy-configuration.yaml
+        permissions: "0644"
+    preKubeadmCommands:
+      - cat /run/kubeadm/kube-proxy-configuration.yaml >> /run/kubeadm/kubeadm.yaml
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: example-md-0
+spec:
+  clusterName: example
+  replicas: 3
+  strategy: 
+    rollingUpdate:
+      deletePolicy: Random
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  selector:
+    matchLabels: 
+      cluster: example
+      node-group: md-0
+  template:
+    metadata:
+      labels: 
+        cluster: example
+        node-group: md-0
+    spec:
+      clusterName: example
+      version: 1.24.2
+      failureDomain: nova
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+          name: example-md-0
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha5
+        kind: OpenStackMachineTemplate
+        name: example-md-0
+      nodeDrainTimeout: 5m
+---
+# Source: openstack-cluster/templates/cluster-openstack.yaml
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha5
+kind: OpenStackCluster
+metadata:
+  name: example
+spec:
+  identityRef:
+    kind: Secret
+    name: example-cloud-credentials
+  cloudName: openstack
+  managedSecurityGroups: true
+  allowAllInClusterTraffic: true
+  apiServerLoadBalancer:
+    enabled: true
+  disableAPIServerFloatingIP: false
+  apiServerPort: 6443
+---
+# Source: openstack-cluster/templates/control-plane/openstack-machine-template.yaml
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha5
+kind: OpenStackMachineTemplate
+metadata:
+  name: example-control-plane
+spec:
+  template:
+    spec:
+      identityRef:
+        kind: Secret
+        name: example-cloud-credentials
+      cloudName: openstack
+      flavor: <flavor name>
+      imageUUID: <image id>
+---
+# Source: openstack-cluster/templates/node-group/openstack-machine-template.yaml
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha5
+kind: OpenStackMachineTemplate
+metadata:
+  name: example-md-0-4acffa05
+spec: 
+  template:
+    spec:
+      identityRef:
+        kind: Secret
+        name: example-cloud-credentials
+      cloudName: openstack
+      flavor: <flavor name>
+      imageUUID: <image id>

@@ -1,0 +1,25 @@
+apiVersion: addons.stackhpc.com/v1alpha1
+kind: HelmRelease
+metadata:
+  name: example-cni-calico
+spec:
+  clusterName: example
+  bootstrap: true
+  chart:
+    repo: https://projectcalico.docs.tigera.io/charts
+    name: tigera-operator
+    version: v3.23.3
+  targetNamespace: tigera-operator
+  releaseName: cni-calico
+  valuesSources:
+    - template: |
+        installation:
+          calicoNetwork:
+            bgp: Disabled
+            nodeAddressAutodetectionV4:
+              kubernetes: NodeInternalIP
+            ipPools:
+        {% for cidr in cluster.spec.clusterNetwork.pods.cidrBlocks %}
+              - cidr: {{ cidr }}
+                encapsulation: VXLAN
+        {% endfor %}

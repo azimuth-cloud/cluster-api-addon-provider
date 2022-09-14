@@ -1,0 +1,36 @@
+---
+apiVersion: addons.stackhpc.com/v1alpha1
+kind: Manifests
+metadata:
+  name: example-cloud-config
+spec:
+  clusterName: example
+  bootstrap: true
+  targetNamespace: openstack-system
+  releaseName: cloud-config
+  manifestSources:
+    - template: |
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: cloud-config
+        data:
+          {{ dict(cloud_identity.data) | toyaml | indent(2) }}
+        stringData:
+          cloud.conf: |
+            [Global]
+            use-clouds=true
+            clouds-file=/etc/config/clouds.yaml
+            cloud=openstack
+        {%- if "cacert" in cloud_identity.data %}
+            ca-file=/etc/config/cacert
+        {%- endif %}
+
+            [Networking]
+            internal-network-name={{ infra_cluster.status.network.name }}
+
+            [LoadBalancer]
+            floating-network-id={{ infra_cluster.status.externalNetwork.id }}
+
+            [BlockStorage]
+            ignore-volume-az=true

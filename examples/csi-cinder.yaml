@@ -1,0 +1,37 @@
+apiVersion: addons.stackhpc.com/v1alpha1
+kind: HelmRelease
+metadata:
+  name: example-csi-cinder
+spec:
+  clusterName: example
+  bootstrap: true
+  chart:
+    repo: https://kubernetes.github.io/cloud-provider-openstack
+    name: openstack-cinder-csi
+    version: 2.2.0
+  targetNamespace: openstack-system
+  releaseName: csi-cinder
+  valuesSources:
+    - template: |
+        secret:
+          enabled: true
+          create: false
+          name: cloud-config
+        csi:
+          plugin:
+            # This has to be non-empty or the chart fails to render
+            volumes:
+              - name: cacert
+                emptyDir: {}
+            volumeMounts:
+              - name: cloud-config
+                mountPath: /etc/config
+                readOnly: true
+              - name: cloud-config
+                mountPath: /etc/kubernetes
+                readOnly: true
+        storageClass:
+          enabled: true
+          delete:
+            isDefault: true
+        clusterID: {{ cluster.metadata.name }}
