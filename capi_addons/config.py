@@ -1,6 +1,6 @@
 import typing as t
 
-from pydantic import Field, constr
+from pydantic import Field, conint, constr
 
 from configomatic import Configuration as BaseConfiguration, Section, LoggingConfiguration
 
@@ -29,9 +29,9 @@ class Configuration(BaseConfiguration):
     Top-level configuration model.
     """
     class Config:
-        default_path = "/etc/capi-addons/config.yaml"
-        path_env_var = "CAPI_ADDONS_CONFIG"
-        env_prefix = "CAPI_ADDONS"
+        default_path = "/etc/capi-addon-provider/config.yaml"
+        path_env_var = "CAPI_ADDON_PROVIDER_CONFIG"
+        env_prefix = "CAPI_ADDON_PROVIDER"
 
     #: The logging configuration
     logging: LoggingConfiguration = Field(default_factory = LoggingConfiguration)
@@ -44,6 +44,12 @@ class Configuration(BaseConfiguration):
     crd_categories: t.List[constr(min_length = 1)] = Field(
         default_factory = lambda: ["cluster-api", "capi-addons"]
     )
+
+    #: The field manager name to use for server-side apply
+    easykube_field_manager: constr(min_length = 1) = "cluster-api-addon-provider"
+
+    #: The delay to use for temporary errors by default
+    temporary_error_delay: conint(gt = 0) = 15
 
     #: The Helm client configuration
     helm_client: HelmClientConfiguration = Field(default_factory = HelmClientConfiguration)

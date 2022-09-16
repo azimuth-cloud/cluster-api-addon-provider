@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cluster-api-addon-provider.fullname" . }}
+  labels: {{ include "cluster-api-addon-provider.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    !include "/etc/capi-addon-provider/defaults.yaml,/etc/capi-addon-provider/user-config.yaml"
+  defaults.yaml: |
+    easykubeFieldManager: {{ include "cluster-api-addon-provider.fullname" . }}
+  user-config.yaml: |
+    {{- toYaml .Values.config | nindent 4 }}

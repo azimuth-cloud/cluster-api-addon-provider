@@ -1,0 +1,7 @@
+.git
+Dockerfile
+**/__pycache__
+*.egg-info
+.python-version
+chart
+examples

@@ -31,17 +31,13 @@ from pydantic.json import pydantic_encoder
 ek_client = (
     Configuration
         .from_environment(json_encoder = pydantic_encoder)
-        .async_client(default_field_manager = "cluster-api-addons-manager")
+        .async_client(default_field_manager = settings.easykube_field_manager)
 )
 
 
 # Create a registry of custom resources and populate it from the models module
 registry = CustomResourceRegistry(settings.api_group, settings.crd_categories)
 registry.discover_models(models)
-
-
-# Create resource specs for the Cluster API resources we need to access
-Cluster = ResourceSpec("cluster.x-k8s.io/v1beta1", "clusters", "Cluster", True)
 
 
 @kopf.on.startup()
@@ -109,7 +105,7 @@ async def clients_for_cluster(kubeconfig_secret):
         ek_client_target = (
             Configuration
                 .from_kubeconfig_data(kubeconfig_data, json_encoder = pydantic_encoder)
-                .async_client(default_field_manager = "cluster-api-addons-manager")
+                .async_client(default_field_manager = settings.easykube_field_manager)
         )
         # Get a Helm client for the target cluster
         helm_client = HelmClient(
@@ -156,7 +152,9 @@ async def handle_addon_updated(addon, **kwargs):
         # Make sure the status has been initialised at the earliest possible opportunity
         await addon.init_status(ek_client)
         # Check that the cluster associated with the addon exists
-        cluster = await Cluster(ek_client).fetch(
+        api = await ek_client.api_preferred_version("cluster.x-k8s.io")
+        resource = await api.resource("clusters")
+        cluster = await resource.fetch(
             addon.spec.cluster_name,
             namespace = addon.metadata.namespace
         )
@@ -170,7 +168,10 @@ async def handle_addon_updated(addon, **kwargs):
             "ControlPlaneInitialized" if addon.spec.bootstrap else "Ready"
         )
         if not ready:
-            raise kopf.TemporaryError(f"cluster '{addon.spec.cluster_name}' is not ready")
+            raise kopf.TemporaryError(
+                f"cluster '{addon.spec.cluster_name}' is not ready",
+                delay = settings.temporary_error_delay
+            )
         # Get the infra cluster for the CAPI cluster
         infra_cluster = await fetch_ref(
             cluster.spec["infrastructureRef"],
@@ -204,12 +205,12 @@ async def handle_addon_updated(addon, **kwargs):
     # Let unexpected errors bubble without suppressing the stack trace so they can be debugged
     except ApiError as exc:
         if exc.status_code == 404:
-            raise kopf.TemporaryError(str(exc))
+            raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
         else:
             raise
     except helm_errors.ConnectionError as exc:
         # Assume connection errors are temporary
-        raise kopf.TemporaryError(str(exc))
+        raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
     except (helm_errors.ChartNotFoundError, helm_errors.FailedToRenderChartError) as exc:
         # These are permanent errors that can only be resolved by changing the spec
         addon.set_phase(api.AddonPhase.FAILED, str(exc))
@@ -223,7 +224,9 @@ async def handle_addon_deleted(addon, **kwargs):
     Executes whenever an addon is deleted.
     """
     try:
-        cluster = await Cluster(ek_client).fetch(
+        api = await ek_client.api_preferred_version("cluster.x-k8s.io")
+        resource = await api.resource("clusters")
+        cluster = await resource.fetch(
             addon.spec.cluster_name,
             namespace = addon.metadata.namespace
         )
@@ -245,7 +248,7 @@ async def handle_addon_deleted(addon, **kwargs):
     except ApiError as exc:
         # If the cluster does not exist, we are done
         if exc.status_code == 404:
-            raise kopf.TemporaryError(str(exc))
+            return
         else:
             raise
     clients = clients_for_cluster(secret)
@@ -257,4 +260,4 @@ async def handle_addon_deleted(addon, **kwargs):
             return
         except helm_errors.ConnectionError as exc:
             # Assume connection errors are temporary
-            raise kopf.TemporaryError(str(exc))
+            raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)

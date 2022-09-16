@@ -1,0 +1,31 @@
+# Configuration for the operator
+# For available options, see capi_addons/config.py
+# The vast majority of cases will not need to specify any configuration
+config: {}
+
+# The operator image to use
+image:
+  repository: ghcr.io/stackhpc/cluster-api-addon-provider
+  pullPolicy: IfNotPresent
+  tag: ""  # Defaults to appVersion
+
+imagePullSecrets: []
+
+# Pod-level security context
+podSecurityContext:
+  runAsNonRoot: true
+
+# Container-level security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: true
+
+# Resources for the operator container
+resources: {}
+
+# Scheduling parameters for the operator pod
+nodeSelector: {}
+tolerations: []
+affinity: {}
