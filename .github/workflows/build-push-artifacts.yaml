@@ -1,0 +1,61 @@
+name: Publish artifacts
+on: push
+jobs:
+  build_push_images:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate metadata for image
+        id: image-meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ghcr.io/stackhpc/cluster-api-addon-provider
+          # Produce the branch name or tag and the SHA as tags
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=
+
+      - name: Build and push image
+        uses: stackhpc/github-actions/docker-multiarch-build-push@master
+        with:
+          cache-key: cluster-api-addon-provider
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.image-meta.outputs.tags }}
+          labels: ${{ steps.image-meta.outputs.labels }}
+
+  build_push_chart:
+    name: Build and push Helm chart
+    runs-on: ubuntu-latest
+    # Only build and push the chart if the images built successfully
+    needs: [build_push_images]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+        with:
+          # This is important for the semver action to work correctly
+          # when determining the number of commits since the last tag
+          fetch-depth: 0
+
+      - name: Get SemVer version for current commit
+        id: semver
+        uses: stackhpc/github-actions/semver@master
+
+      - name: Publish Helm charts
+        uses: stackhpc/github-actions/helm-publish@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: ${{ steps.semver.outputs.version }}
+          app-version: ${{ steps.semver.outputs.short-sha }}
