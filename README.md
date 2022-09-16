@@ -6,15 +6,25 @@ that provides
 [custom resources](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
 for defining addons for [Cluster API](https://cluster-api.sigs.k8s.io/) clusters.
 
-The resources that this provider exposes differ from the
+The resources exposed by this provider differ from the
 [Cluster API ClusterResourceSet](https://cluster-api.sigs.k8s.io/tasks/experimental-features/cluster-resource-set.html) in the following significant ways:
 
-  1. It supports reconciliation, i.e. the resources on the target cluster are updated
+  1. They support reconciliation, i.e. the resources on the target cluster are updated
      when the addon resource is modified. `ClusterResourceSet` is a one-shot dump of manifests
      onto the target cluster.
-  2. It can install addons using Helm charts as well as plain manifests.
+  2. They can install addons using Helm charts as well as plain manifests.
   3. Addons are able to access information about the Cluster API cluster and use it to
-     generate configuration (e.g. Helm values or manifests).
+     generate configuration (e.g. Helm values or manifests).  
+     This is especially useful for values that are unknown at the time the addon resources
+     are created, e.g. the ID of a network that is created by an infrastructure provider.
+
+The Cluster API addon provider currently supports two sources:
+
+  * A Helm chart from a [chart repository](https://helm.sh/docs/topics/chart_repository/)
+  * Vanilla manifests
+
+Additional sources (e.g. `Kustomization`s) and chart sources (e.g. fixed URLs and OCI
+repositories) may be added in the future.
 
 ## Installation
 
@@ -31,17 +41,7 @@ helm upgrade \
   --version ">=0.1.0-dev.0.main.0,<0.1.0-dev.0.main.9999999999"
 ```
 
-## Usage
-
-The Cluster API addon provider currently supports two sources:
-
-  * A Helm chart from a [chart repository](https://helm.sh/docs/topics/chart_repository/)
-  * Vanilla manifests
-
-Additional sources (e.g. `Kustomization`s) and chart sources (e.g. fixed URLs) may be added
-in the future.
-
-### Templates
+## Templates
 
 Some elements of the addon resources, such as values sources for `HelmRelease` or
 manifest sources for `Manifests`, are treated as templates that have access to information
@@ -49,7 +49,7 @@ about the target Cluster API cluster.
 
 Templates use the [Jinja2](https://jinja.palletsprojects.com/en/3.1.x/templates/) syntax.
 
-#### Variables
+### Variables
 
 Templates have access to the following variables:
 
@@ -67,7 +67,7 @@ Templates have access to the following variables:
     whether it exists at all, depends on the infrastructure provider in use. In some cases, it is
     a `Secret` (e.g. for OpenStack) but in other cases it may be another CRD (e.g. AWS).
 
-#### Filters
+### Filters
 
 The following custom filters are also made available to templates in addition to the
 [Jinja2 builtin filters](https://jinja.palletsprojects.com/en/3.1.x/templates/#builtin-filters):
@@ -83,7 +83,7 @@ The following custom filters are also made available to templates in addition to
   * `b64decode`  
     Decodes the given base64-encoded data and returns a UTF-8 string.
 
-### HelmRelease
+## HelmRelease
 
 To install a Helm chart onto a Cluster API cluster, you can create a `HelmRelease` in
 the same namespace as the Cluster API `Cluster` resource:
@@ -143,7 +143,7 @@ spec:
               {{ cluster.spec.clusterNetwork.pods.cidrBlocks | toyaml | indent(6) }}
 ```
 
-### Manifests
+## Manifests
 
 To install manifests onto a Cluster API cluster that are not packaged as a Helm chart,
 you can create a `Manifests` object in the same namespace as the Cluster API `Cluster` object:
