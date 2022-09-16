@@ -1,3 +1,4 @@
+import base64
 import typing as t
 
 import jinja2
@@ -19,7 +20,9 @@ class Loader:
         self._env.filters.update(
             mergeconcat = utils.mergeconcat,
             fromyaml = yaml.safe_load,
-            toyaml = yaml.safe_dump
+            toyaml = yaml.safe_dump,
+            b64encode = lambda data: base64.b64encode(data).decode(),
+            b64decode = lambda data: base64.b64decode(data).decode()
         )
 
     def render_string(self, template_str: str, **params: t.Any) -> str:

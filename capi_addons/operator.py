@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 # Initialise the template loader
-template_loader = template.Loader(settings = settings)
+template_loader = template.Loader()
 
 
 # Initialise an easykube client from the environment

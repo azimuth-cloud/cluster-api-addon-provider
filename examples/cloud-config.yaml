@@ -15,7 +15,7 @@ spec:
         metadata:
           name: cloud-config
         data:
-          {{ dict(cloud_identity.data) | toyaml | indent(2) }}
+          {{ cloud_identity.data | toyaml | indent(2) }}
         stringData:
           cloud.conf: |
             [Global]
