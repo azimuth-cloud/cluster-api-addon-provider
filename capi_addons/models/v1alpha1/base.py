@@ -8,8 +8,8 @@ import yaml
 
 from pydantic import Field, constr
 
-from easykube.kubernetes.client import AsyncClient, Resource
-from kube_custom_resource import CustomResource, Scope, schema
+from easykube.kubernetes.client import AsyncClient
+from kube_custom_resource import CustomResource, schema
 from pyhelm3 import (
     Client,
     Chart,
@@ -133,34 +133,51 @@ class Addon(CustomResource, abstract = True):
         description = "The status for the addon."
     )
 
+    async def save_status(self, ek_client: AsyncClient):
+        """
+        Save the status of this addon using the given easykube client.
+        """
+        ekapi = ek_client.api(self.api_version)
+        resource = await ekapi.resource(f"{self._meta.plural_name}/status")
+        data = await resource.server_side_apply(
+            self.metadata.name,
+            {
+                # Include the resource version for optimistic concurrency
+                "metadata": { "resourceVersion": self.metadata.resource_version },
+                "status": self.status.dict(exclude_defaults = True),
+            },
+            namespace = self.metadata.namespace
+        )
+        # Store the new resource version
+        self.metadata.resource_version = data["metadata"]["resourceVersion"]
+
     async def init_metadata(
         self,
         ek_client: AsyncClient,
         cluster: typing.Dict[str, typing.Any]
     ):
         # Apply any required changes
-        include_owner_references = self.metadata.add_owner_reference(
+        patch_required = self.metadata.add_owner_reference(
             cluster,
             block_owner_deletion = True
         )
-        # Generate the patch for the changes
-        patch = {}
-        if include_owner_references:
-            patch["ownerReferences"] = self.metadata.owner_references
         # Apply the patch if required
-        if patch:
-            resource = Resource(
-                ek_client,
-                self.api_version,
-                self._meta.plural_name,
-                self._meta.kind,
-                self._meta.scope is Scope.NAMESPACED
-            )
-            await resource.server_side_apply(
+        if patch_required:
+            ekapi = ek_client.api(self.api_version)
+            resource = await ekapi.resource(self._meta.plural_name)
+            data = await resource.server_side_apply(
                 self.metadata.name,
-                { "metadata": patch },
+                {
+                    "metadata": {
+                        "ownerReferences": self.metadata.owner_references,
+                        # Include the resource version for optimistic concurrency
+                        "resourceVersion": self.metadata.resource_version,
+                    },
+                },
                 namespace = self.metadata.namespace
             )
+            # Store the new resource version
+            self.metadata.resource_version = data["metadata"]["resourceVersion"]
 
     async def init_status(self, ek_client: AsyncClient):
         """
@@ -178,22 +195,17 @@ class Addon(CustomResource, abstract = True):
         # Reset the message unless the phase is failed
         self.status.failure_message = message if phase == AddonPhase.FAILED else ""
 
-    async def save_status(self, ek_client: AsyncClient):
+    def uses_configmap(self, name: str):
         """
-        Save the status of this addon using the given easykube client.
+        Returns True if this addon uses the named configmap, False otherwise.
         """
-        resource = Resource(
-            ek_client,
-            self.api_version,
-            f"{self._meta.plural_name}/status",
-            self._meta.kind,
-            self._meta.scope is Scope.NAMESPACED
-        )
-        await resource.server_side_apply(
-            self.metadata.name,
-            { "status": self.status.dict() },
-            namespace = self.metadata.namespace
-        )
+        raise NotImplementedError
+
+    def uses_secret(self, name: str):
+        """
+        Returns True if this addon uses the named secret, False otherwise.
+        """
+        raise NotImplementedError
 
     @contextlib.asynccontextmanager
     async def get_chart(

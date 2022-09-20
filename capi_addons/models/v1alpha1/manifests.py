@@ -180,6 +180,26 @@ class Manifests(
     subresources = {"status": {}},
     printer_columns = [
         {
+            "name": "Cluster",
+            "type": "string",
+            "jsonPath": ".spec.clusterName",
+        },
+        {
+            "name": "Bootstrap",
+            "type": "string",
+            "jsonPath": ".spec.bootstrap",
+        },
+        {
+            "name": "Target Namespace",
+            "type": "string",
+            "jsonPath": ".spec.targetNamespace",
+        },
+        {
+            "name": "Release Name",
+            "type": "string",
+            "jsonPath": ".spec.releaseName",
+        },
+        {
             "name": "Phase",
             "type": "string",
             "jsonPath": ".status.phase",
@@ -188,16 +208,6 @@ class Manifests(
             "name": "Revision",
             "type": "integer",
             "jsonPath": ".status.revision",
-        },
-        {
-            "name": "Release Namespace",
-            "type": "string",
-            "jsonPath": ".spec.targetNamespace",
-        },
-        {
-            "name": "Release Name",
-            "type": "string",
-            "jsonPath": ".spec.releaseName",
         },
     ]
 ):
@@ -208,6 +218,26 @@ class Manifests(
         ...,
         description = "The specification for the manifests."
     )
+
+    def uses_configmap(self, name: str):
+        for source in self.spec.manifest_sources:
+            if (
+                isinstance(source, ManifestConfigMapSource) and
+                source.config_map.name == name
+            ):
+                return True
+        else:
+            return False
+
+    def uses_secret(self, name: str):
+        for source in self.spec.manifest_sources:
+            if (
+                isinstance(source, ManifestSecretSource) and
+                source.secret.name == name
+            ):
+                return True
+        else:
+            return False
 
     async def get_resources(
         self,

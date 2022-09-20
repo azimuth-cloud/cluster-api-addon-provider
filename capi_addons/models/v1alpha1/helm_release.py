@@ -189,6 +189,26 @@ class HelmRelease(
     subresources = {"status": {}},
     printer_columns = [
         {
+            "name": "Cluster",
+            "type": "string",
+            "jsonPath": ".spec.clusterName",
+        },
+        {
+            "name": "Bootstrap",
+            "type": "string",
+            "jsonPath": ".spec.bootstrap",
+        },
+        {
+            "name": "Target Namespace",
+            "type": "string",
+            "jsonPath": ".spec.targetNamespace",
+        },
+        {
+            "name": "Release Name",
+            "type": "string",
+            "jsonPath": ".spec.releaseName",
+        },
+        {
             "name": "Phase",
             "type": "string",
             "jsonPath": ".status.phase",
@@ -197,16 +217,6 @@ class HelmRelease(
             "name": "Revision",
             "type": "integer",
             "jsonPath": ".status.revision",
-        },
-        {
-            "name": "Release Namespace",
-            "type": "string",
-            "jsonPath": ".spec.targetNamespace",
-        },
-        {
-            "name": "Release Name",
-            "type": "string",
-            "jsonPath": ".spec.releaseName",
         },
         {
             "name": "Chart Name",
@@ -227,6 +237,26 @@ class HelmRelease(
         ...,
         description = "The specification for the Helm release."
     )
+
+    def uses_configmap(self, name: str):
+        for source in self.spec.values_sources:
+            if (
+                isinstance(source, HelmValuesConfigMapSource) and
+                source.config_map.name == name
+            ):
+                return True
+        else:
+            return False
+
+    def uses_secret(self, name: str):
+        for source in self.spec.values_sources:
+            if (
+                isinstance(source, HelmValuesSecretSource) and
+                source.secret.name == name
+            ):
+                return True
+        else:
+            return False
 
     def get_chart(
         self,

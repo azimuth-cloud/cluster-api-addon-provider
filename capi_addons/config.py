@@ -1,6 +1,6 @@
 import typing as t
 
-from pydantic import Field, conint, constr
+from pydantic import Field, conint, constr, validator
 
 from configomatic import Configuration as BaseConfiguration, Section, LoggingConfiguration
 
@@ -53,6 +53,19 @@ class Configuration(BaseConfiguration):
 
     #: The Helm client configuration
     helm_client: HelmClientConfiguration = Field(default_factory = HelmClientConfiguration)
+
+    #: Prefix to use for annotations containing a configmap checksum
+    configmap_annotation_prefix: constr(min_length = 1) = None
+    #: Prefix to use for annotations containing a secret checksum
+    secret_annotation_prefix: constr(min_length = 1) = None
+
+    @validator("configmap_annotation_prefix", pre = True, always = True)
+    def default_configmap_annotation_prefix(cls, v, *, values, **kwargs):
+        return v or f"configmap.{values['annotation_prefix']}"
+
+    @validator("secret_annotation_prefix", pre = True, always = True)
+    def default_secret_annotation_prefix(cls, v, *, values, **kwargs):
+        return v or f"secret.{values['annotation_prefix']}"
 
 
 settings = Configuration()

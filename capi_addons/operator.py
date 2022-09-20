@@ -1,13 +1,14 @@
 import base64
 import contextlib
 import functools
+import hashlib
 import logging
 import sys
 import tempfile
 
 import kopf
 
-from easykube import Configuration, ApiError, ResourceSpec, resources as k8s
+from easykube import Configuration, ApiError, resources as k8s
 
 from kube_custom_resource import CustomResourceRegistry
 
@@ -131,10 +132,8 @@ async def fetch_ref(ref, default_namespace):
 
 @addon_handler(kopf.on.create)
 # Run when the annotations are updated as well as the spec
-# This allows the use of checksum annotations to trigger a reinstall when the content
-# of a configmap or secret changes
-# Alternatively, the name of the configmap/secret can be changed when the content changes,
-# and the corresponding change to the addon spec will trigger the reinstall
+# This means that when we change an annotation in response to a configmap or secret being
+# changed, the upgrade logic will be executed for the new configmap or secret content
 @addon_handler(kopf.on.update, field = "metadata.annotations")
 @addon_handler(kopf.on.update, field = "spec")
 async def handle_addon_updated(addon, **kwargs):
@@ -261,3 +260,71 @@ async def handle_addon_deleted(addon, **kwargs):
         except helm_errors.ConnectionError as exc:
             # Assume connection errors are temporary
             raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+
+
+def compute_checksum(data):
+    """
+    Compute the checksum of the given data from a configmap or secret.
+    """
+    data_str = ";".join(sorted(f"{k}={v}" for k, v in data.items())).encode()
+    return hashlib.sha256(data_str).hexdigest()
+
+
+async def annotate_addon(addon, annotation, value):
+    """
+    Applies the given annotation to the specified addon if it is not already present.
+    """
+    existing = addon.metadata.annotations.get(annotation)
+    if existing and existing == value:
+        return
+    ekapi = ek_client.api(addon.api_version)
+    resource = await ekapi.resource(addon._meta.plural_name)
+    _ = await resource.patch(
+        addon.metadata.name,
+        { "metadata": { "annotations": { annotation: value } } },
+        namespace = addon.metadata.namespace
+    )
+
+
+@kopf.on.event("configmap")
+async def handle_configmap_event(name, namespace, body, **kwargs):
+    """
+    Executes every time a configmap is changed.
+    """
+    # Compute the checksum of the configmap
+    checksum = compute_checksum(body.get("data", {}))
+    # For each addon type, check if there are any addons that depend on the configmap
+    for crd in registry:
+        preferred_version = next(k for k, v in crd.versions.items() if v.storage)
+        api = ek_client.api(f"{crd.api_group}/{preferred_version}")
+        resource = await api.resource(crd.plural_name)
+        async for addon_data in resource.list(namespace = namespace):
+            addon = registry.get_model_instance(addon_data)
+            if addon.uses_configmap(name):
+                await annotate_addon(
+                    addon,
+                    f"{settings.configmap_annotation_prefix}/{name}",
+                    checksum
+                )
+
+
+@kopf.on.event("secret")
+async def handle_secret_event(name, namespace, body, **kwargs):
+    """
+    Executes every time a secret is changed.
+    """
+    # Compute the checksum of the configmap
+    checksum = compute_checksum(body.get("data", {}))
+    # For each addon type, check if there are any addons that depend on the secret
+    for crd in registry:
+        preferred_version = next(k for k, v in crd.versions.items() if v.storage)
+        api = ek_client.api(f"{crd.api_group}/{preferred_version}")
+        resource = await api.resource(crd.plural_name)
+        async for addon_data in resource.list(namespace = namespace):
+            addon = registry.get_model_instance(addon_data)
+            if addon.uses_secret(name):
+                await annotate_addon(
+                    addon,
+                    f"{settings.secret_annotation_prefix}/{name}",
+                    checksum
+                )

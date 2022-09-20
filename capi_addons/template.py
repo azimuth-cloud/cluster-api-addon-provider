@@ -1,7 +1,10 @@
 import base64
+import json
 import typing as t
 
 import jinja2
+
+from pydantic.json import pydantic_encoder
 
 import yaml
 
@@ -20,7 +23,17 @@ class Loader:
         self._env.filters.update(
             mergeconcat = utils.mergeconcat,
             fromyaml = yaml.safe_load,
-            toyaml = yaml.safe_dump,
+            # In order to benefit from correct serialisation of a variety of objects,
+            # including Pydantic models, generic iterables and generic mappings, we go
+            # via JSON with the Pydantic encoder
+            toyaml = lambda obj: yaml.safe_dump(
+                json.loads(
+                    json.dumps(
+                        obj,
+                        default = pydantic_encoder
+                    )
+                )
+            ),
             b64encode = lambda data: base64.b64encode(data).decode(),
             b64decode = lambda data: base64.b64decode(data).decode()
         )

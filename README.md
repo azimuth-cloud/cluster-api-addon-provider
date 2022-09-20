@@ -14,17 +14,17 @@ The resources exposed by this provider differ from the
      onto the target cluster.
   2. They can install addons using Helm charts as well as plain manifests.
   3. Addons are able to access information about the Cluster API cluster and use it to
-     generate configuration (e.g. Helm values or manifests).  
-     This is especially useful for values that are unknown at the time the addon resources
-     are created, e.g. the ID of a network that is created by an infrastructure provider.
+     generate configuration (e.g. Helm values or manifests). This is especially useful
+     for values that are unknown at the time the addon resources are created, e.g. the
+     ID of a network that is created by an infrastructure provider.
 
-The Cluster API addon provider currently supports two sources:
+The Cluster API addon provider currently supports two sources for addons:
 
   * A Helm chart from a [chart repository](https://helm.sh/docs/topics/chart_repository/)
   * Vanilla manifests
 
-Additional sources (e.g. `Kustomization`s) and chart sources (e.g. fixed URLs and OCI
-repositories) may be added in the future.
+Additional addon sources (e.g. `Kustomization`s) and Helm chart sources (e.g. fixed URLs
+and OCI repositories) will likely be added in the future.
 
 ## Installation
 
