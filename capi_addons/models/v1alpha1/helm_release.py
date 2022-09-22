@@ -123,7 +123,7 @@ class HelmValuesSecretSource(schema.BaseModel):
             namespace = addon.metadata.namespace
         )
         return template_loader.yaml_string(
-            base64.b64decode(secret.data[self.secret.key]),
+            base64.b64decode(secret.data[self.secret.key]).decode(),
             addon = addon,
             cluster = cluster,
             infra_cluster = infra_cluster,

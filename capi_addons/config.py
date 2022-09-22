@@ -39,7 +39,7 @@ class Configuration(BaseConfiguration):
     #: The API group of the cluster CRDs
     api_group: constr(min_length = 1) = "addons.stackhpc.com"
     #: The prefix to use for operator annotations
-    annotation_prefix: constr(min_length = 1) = "addons.stackhpc.com"
+    annotation_prefix: constr(min_length = 1) = None
     #: A list of categories to place CRDs into
     crd_categories: t.List[constr(min_length = 1)] = Field(
         default_factory = lambda: ["cluster-api", "capi-addons"]
@@ -54,10 +54,20 @@ class Configuration(BaseConfiguration):
     #: The Helm client configuration
     helm_client: HelmClientConfiguration = Field(default_factory = HelmClientConfiguration)
 
+    #: Label indicating that a configmap or secret should be watched for changes
+    watch_label: constr(min_length = 1) = None
     #: Prefix to use for annotations containing a configmap checksum
     configmap_annotation_prefix: constr(min_length = 1) = None
     #: Prefix to use for annotations containing a secret checksum
     secret_annotation_prefix: constr(min_length = 1) = None
+
+    @validator("annotation_prefix", pre = True, always = True)
+    def default_annotation_prefix(cls, v, *, values, **kwargs):
+        return v or values['api_group']
+
+    @validator("watch_label", pre = True, always = True)
+    def default_watch_label(cls, v, *, values, **kwargs):
+        return v or f"{values['api_group']}/watch"
 
     @validator("configmap_annotation_prefix", pre = True, always = True)
     def default_configmap_annotation_prefix(cls, v, *, values, **kwargs):

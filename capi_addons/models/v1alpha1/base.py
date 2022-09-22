@@ -374,7 +374,7 @@ class Addon(CustomResource, abstract = True):
                 await self.save_status(ek_client_management)
                 crds = await chart.crds()
                 for crd in crds:
-                    await ek_client_target.apply_object(crd)
+                    await ek_client_target.apply_object(crd, force = True)
                 current_revision = await helm_client.install_or_upgrade_release(
                     self.spec.release_name or self.metadata.name,
                     chart,
@@ -402,6 +402,7 @@ class Addon(CustomResource, abstract = True):
                 namespace = resource["metadata"].get("namespace", "")
             )
             for resource in (await current_revision.resources())
+            if resource
         ]
         await self.save_status(ek_client_management)
 
