@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import contextlib
 import functools
@@ -130,6 +131,31 @@ async def fetch_ref(ref, default_namespace):
     return await resource.fetch(ref["name"], namespace = ref.get("namespace", default_namespace))
 
 
+async def until_deleted(addon):
+    """
+    Runs until the given addon is deleted.
+
+    Used as a circuit-breaker to stop an in-progress install/upgrade when an addon is deleted.
+    """
+    ekapi = ek_client.api(addon.api_version)
+    resource = await ekapi.resource(addon._meta.plural_name)
+    while True:
+        try:
+            initial, events = await resource.watch_one(
+                addon.metadata.name,
+                namespace = addon.metadata.namespace
+            )
+            if initial and initial["metadata"].get("deletionTimestamp"):
+                return
+            async for event in events:
+                if event["object"]["metadata"].get("deletionTimestamp"):
+                    return
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            continue
+
+
 @addon_handler(kopf.on.create)
 # Run when the annotations are updated as well as the spec
 # This means that when we change an annotation in response to a configmap or secret being
@@ -190,15 +216,33 @@ async def handle_addon_updated(addon, **kwargs):
         )
         # Get easykube and Helm clients for the target cluster and use them to deploy the addon
         async with clients_for_cluster(secret) as (ek_client_target, helm_client):
-            await addon.install_or_upgrade(
-                template_loader,
-                ek_client,
-                ek_client_target,
-                helm_client,
-                cluster,
-                infra_cluster,
-                cloud_identity
+            # If the addon is deleted while an install or upgrade is in progress, cancel it
+            install_upgrade_task = asyncio.create_task(
+                addon.install_or_upgrade(
+                    template_loader,
+                    ek_client,
+                    ek_client_target,
+                    helm_client,
+                    cluster,
+                    infra_cluster,
+                    cloud_identity
+                )
             )
+            wait_for_delete_task = asyncio.create_task(until_deleted(addon))
+            done, pending = await asyncio.wait(
+                { install_upgrade_task, wait_for_delete_task },
+                return_when = asyncio.FIRST_COMPLETED
+            )
+            # Cancel the pending tasks and give them a chance to clean up
+            for task in pending:
+                task.cancel()
+                try:
+                    _ = await task
+                except asyncio.CancelledError:
+                    continue
+            # Ensure that any exceptions from the completed tasks are raised
+            for task in done:
+                _ = await task
     # Handle expected errors by converting them to kopf errors
     # This suppresses the stack trace in logs/events
     # Let unexpected errors bubble without suppressing the stack trace so they can be debugged
@@ -207,7 +251,10 @@ async def handle_addon_updated(addon, **kwargs):
             raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
         else:
             raise
-    except helm_errors.ConnectionError as exc:
+    except (
+        helm_errors.ConnectionError,
+        helm_errors.CommandCancelledError
+     ) as exc:
         # Assume connection errors are temporary
         raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
     except (
