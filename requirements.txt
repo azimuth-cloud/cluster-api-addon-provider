@@ -20,7 +20,7 @@ kube-custom-resource @ git+https://github.com/stackhpc/kube-custom-resource.git@
 MarkupSafe==2.1.1
 multidict==6.0.2
 pydantic==1.10.2
-pyhelm3 @ git+https://github.com/stackhpc/pyhelm3.git@512f517d6f997ce7a1ffbdcece72d21d785e1297
+pyhelm3 @ git+https://github.com/stackhpc/pyhelm3.git@5308bd1ed0705db973345879d35d74ad5bf5dd66
 python-json-logger==2.0.4
 PyYAML==6.0
 rfc3986==1.5.0
