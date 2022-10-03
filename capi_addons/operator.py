@@ -152,8 +152,6 @@ async def until_deleted(addon):
                     return
         except asyncio.CancelledError:
             return
-        except Exception:
-            continue
 
 
 @addon_handler(kopf.on.create)
@@ -305,6 +303,11 @@ async def handle_addon_deleted(addon, **kwargs):
     async with clients as (ek_client_target, helm_client):
         try:
             await addon.uninstall(ek_client, ek_client_target, helm_client)
+        except ApiError as exc:
+            if exc.status_code == 409:
+                raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+            else:
+                raise
         except helm_errors.ReleaseNotFoundError:
             # If the release doesn't exist, we are done
             return
