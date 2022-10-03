@@ -152,6 +152,8 @@ async def until_deleted(addon):
                     return
         except asyncio.CancelledError:
             return
+        except Exception:
+            continue
 
 
 @addon_handler(kopf.on.create)
