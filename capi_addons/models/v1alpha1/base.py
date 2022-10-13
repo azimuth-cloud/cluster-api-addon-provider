@@ -139,7 +139,7 @@ class Addon(CustomResource, abstract = True):
         """
         ekapi = ek_client.api(self.api_version)
         resource = await ekapi.resource(f"{self._meta.plural_name}/status")
-        data = await resource.server_side_apply(
+        data = await resource.replace(
             self.metadata.name,
             {
                 # Include the resource version for optimistic concurrency
