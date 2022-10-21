@@ -54,6 +54,12 @@ class Configuration(BaseConfiguration):
     #: The Helm client configuration
     helm_client: HelmClientConfiguration = Field(default_factory = HelmClientConfiguration)
 
+    #: Label indicating that an addon belongs to a cluster
+    cluster_label: constr(min_length = 1) = None
+    #: Label indicating the target namespace for the addon
+    release_namespace_label: constr(min_length = 1) = None
+    #: Label indicating the name of the release for the addon
+    release_name_label: constr(min_length = 1) = None
     #: Label indicating that a configmap or secret should be watched for changes
     watch_label: constr(min_length = 1) = None
     #: Prefix to use for annotations containing a configmap checksum
@@ -64,6 +70,18 @@ class Configuration(BaseConfiguration):
     @validator("annotation_prefix", pre = True, always = True)
     def default_annotation_prefix(cls, v, *, values, **kwargs):
         return v or values['api_group']
+
+    @validator("cluster_label", pre = True, always = True)
+    def default_cluster_label(cls, v, *, values, **kwargs):
+        return v or f"{values['api_group']}/cluster"
+
+    @validator("release_namespace_label", pre = True, always = True)
+    def default_release_namespace_label(cls, v, *, values, **kwargs):
+        return v or f"{values['api_group']}/release-namespace"
+
+    @validator("release_name_label", pre = True, always = True)
+    def default_release_name_label(cls, v, *, values, **kwargs):
+        return v or f"{values['api_group']}/release-name"
 
     @validator("watch_label", pre = True, always = True)
     def default_watch_label(cls, v, *, values, **kwargs):

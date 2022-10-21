@@ -18,6 +18,7 @@ from pyhelm3 import (
     ReleaseNotFoundError
 )
 
+from ...config import settings
 from ...template import Loader
 
 
@@ -156,20 +157,30 @@ class Addon(CustomResource, abstract = True):
         ek_client: AsyncClient,
         cluster: typing.Dict[str, typing.Any]
     ):
-        # Apply any required changes
-        patch_required = self.metadata.add_owner_reference(
+        previous_labels = dict(self.metadata.labels)
+        # Make sure that the cluster owns the addon
+        owner_references_updated = self.metadata.add_owner_reference(
             cluster,
             block_owner_deletion = True
         )
+        # Add labels that allow us to filter by cluster, release namespace and release name
+        release_name = self.spec.release_name or self.metadata.name
+        self.metadata.labels.update({
+            settings.cluster_label: cluster.metadata.name,
+            settings.release_namespace_label: self.spec.target_namespace,
+            settings.release_name_label: release_name,
+        })
+        labels_updated = self.metadata.labels == previous_labels
         # Apply the patch if required
-        if patch_required:
+        if owner_references_updated or labels_updated:
             ekapi = ek_client.api(self.api_version)
             resource = await ekapi.resource(self._meta.plural_name)
-            data = await resource.server_side_apply(
+            data = await resource.patch(
                 self.metadata.name,
                 {
                     "metadata": {
                         "ownerReferences": self.metadata.owner_references,
+                        "labels": self.metadata.labels,
                         # Include the resource version for optimistic concurrency
                         "resourceVersion": self.metadata.resource_version,
                     },
