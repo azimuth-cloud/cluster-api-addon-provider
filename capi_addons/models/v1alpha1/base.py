@@ -392,8 +392,6 @@ class Addon(CustomResource, abstract = True):
                     values,
                     cleanup_on_fail = True,
                     namespace = self.spec.target_namespace,
-                    # We already installed the CRDs, so skip them here
-                    skip_crds = True,
                     timeout = self.spec.release_timeout,
                     wait = True
                 )
