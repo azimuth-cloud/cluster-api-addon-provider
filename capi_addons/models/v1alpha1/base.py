@@ -115,6 +115,10 @@ class AddonStatus(schema.BaseModel):
         default_factory = list,
         description = "The resources that were produced for the current revision."
     )
+    notes: typing.Optional[str] = Field(
+        None,
+        description = "The notes from the release."
+    )
     failure_message: str = Field(
         "",
         description = "The reason for entering a failed phase."
@@ -413,6 +417,7 @@ class Addon(CustomResource, abstract = True):
             for resource in (await current_revision.resources())
             if resource
         ]
+        self.status.notes = current_revision.notes
         await self.save_status(ek_client_management)
 
     async def uninstall(
