@@ -1,4 +1,5 @@
 import contextlib
+import hashlib
 import pathlib
 import re
 import tempfile
@@ -327,9 +328,18 @@ class Addon(CustomResource, abstract = True):
             # If the current revision was not deployed successfully, always redeploy
             if current_revision.status != ReleaseRevisionStatus.DEPLOYED:
                 return True
-            # If the current revision was a successful deployment, we only want to deploy
-            # an upgrade if the resources change
-            return bool(await current_revision.release.simulate_upgrade(chart, values))
+            # If the chart has changed from the deployed release, we should redeploy
+            revision_chart = await current_revision.chart_metadata()
+            if revision_chart.name != chart.metadata.name:
+                return True
+            if revision_chart.version != chart.metadata.version:
+                return True
+            # If the values have changed from the deployed release, we should redeploy
+            revision_values = await current_revision.values()
+            if revision_values != values:
+                return True
+            # If the chart and values are the same, there is nothing to do
+            return False
         else:
             # No current revision - install is always required
             return True
@@ -478,19 +488,11 @@ class EphemeralChartAddon(Addon, abstract = True):
             crds_directory.mkdir(parents = True, exist_ok = True)
             templates_directory = chart_directory / "templates"
             templates_directory.mkdir(parents = True, exist_ok = True)
-            # Write a minimal chart metadata file so that Helm recognises it as a chart
-            chart_file = chart_directory / "Chart.yaml"
-            with chart_file.open("w") as fh:
-                yaml.safe_dump(
-                    {
-                        "apiVersion": "v2",
-                        "name": self.spec.release_name or self.metadata.name,
-                        "version": "0.1.0+generated",
-                    },
-                    fh
-                )
             # For each resource in the sources, write a separate file in the chart
             # CRDs go in the crds directory, everything else in the templates directory
+            # As we go, we also build up a hash that is used in the chart name
+            # This allows us to efficiently detect when a redeploy is required
+            hasher = hashlib.sha256()
             async for resource in self.get_resources(
                 template_loader,
                 ek_client,
@@ -509,10 +511,25 @@ class EphemeralChartAddon(Addon, abstract = True):
                 else:
                     path = templates_directory / filename
                 content = yaml.safe_dump(resource)
+                # Update the hash with the content of the file
+                hasher.update(content.encode())
                 # Escape any go template syntax in the resulting document
                 # Note that we only need to escape the starting delimiters as ending delimiters
                 # are ignored without the corresponding start delimiter
                 content = re.sub(r"\{\{\-?", "{{ \"\g<0>\" }}", content)
                 with path.open("w") as fh:
                     fh.write(content)
+            # Write a minimal chart metadata file so that Helm recognises it as a chart
+            chart_file = chart_directory / "Chart.yaml"
+            with chart_file.open("w") as fh:
+                yaml.safe_dump(
+                    {
+                        "apiVersion": "v2",
+                        "name": self.spec.release_name or self.metadata.name,
+                        # Use the first 8 characters of the digest in the version
+                        # This is similar to how git short SHAs work
+                        "version": f"0.1.0+{hasher.hexdigest()[:8]}",
+                    },
+                    fh
+                )
             yield await helm_client.get_chart(chart_directory)
