@@ -48,6 +48,9 @@ class Configuration(BaseConfiguration):
     #: The field manager name to use for server-side apply
     easykube_field_manager: constr(min_length = 1) = "cluster-api-addon-provider"
 
+    #: The namespace that Argo CD is running in
+    argocd_namespace: constr(min_length = 1) = "argocd"
+
     #: The delay to use for temporary errors by default
     temporary_error_delay: conint(gt = 0) = 15
 

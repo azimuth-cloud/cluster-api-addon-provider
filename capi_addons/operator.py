@@ -3,11 +3,14 @@ import base64
 import contextlib
 import functools
 import hashlib
+import json
 import logging
 import sys
 import tempfile
 
 import kopf
+
+import yaml
 
 from easykube import Configuration, ApiError, resources as k8s
 
@@ -70,6 +73,108 @@ async def on_cleanup(**kwargs):
     Runs on operator shutdown.
     """
     await ek_client.aclose()
+
+
+@kopf.on.event("v1", "secrets", field = "type", value = "cluster.x-k8s.io/secret")
+async def handle_kubeconfig_secret_event(type, body, name, namespace, meta, **kwargs):
+    """
+    Executes whenever an event occurs for a Cluster API secret.
+
+    Looks for kubeconfig secrets and synchronises the corresponding Argo cluster secret.
+    """
+    # We are only interested in kubeconfig secrets
+    if not name.endswith("-kubeconfig"):
+        return
+    # Get the Cluster API cluster name from the labels
+    cluster_name = meta["labels"]["cluster.x-k8s.io/cluster-name"]
+    argo_cluster_name = f"clusterapi-{namespace}-{cluster_name}"
+    if type == "DELETED":
+        # When the kubeconfig secret is deleted, remove the Argo secret
+        ekresource = await ek_client.api("v1").resource("secrets")
+        _ = await ekresource.delete(
+            argo_cluster_name,
+            namespace = settings.argocd_namespace
+        )
+    else:
+        # Extract the kubeconfig from the secret and parse it
+        kubeconfig_b64 = body["data"]["value"]
+        kubeconfig_bytes = base64.b64decode(kubeconfig_b64)
+        kubeconfig = yaml.safe_load(kubeconfig_bytes)
+        # Get the cluster and user information from the kubeconfig
+        context_name = kubeconfig["current-context"]
+        context = next(
+            c["context"]
+            for c in kubeconfig["contexts"]
+            if c["name"] == context_name
+        )
+        cluster = next(
+            c["cluster"]
+            for c in kubeconfig["clusters"]
+            if c["name"] == context["cluster"]
+        )
+        user = next(
+            u["user"]
+            for u in kubeconfig["users"]
+            if u["name"] == context["user"]
+        )
+        # Write the secret for Argo CD to pick up
+        _ = await ek_client.apply_object(
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {
+                    "name": argo_cluster_name,
+                    "namespace": settings.argocd_namespace,
+                    "labels": {
+                        "argocd.argoproj.io/secret-type": "cluster",
+                    },
+                    # Annotate the secret with information about the Cluster API cluster
+                    "annotations": {
+                        f"{settings.annotation_prefix}/kubeconfig-secret": f"{namespace}/{name}",
+                    },
+                },
+                "type": "Opaque",
+                "stringData": {
+                    "name": argo_cluster_name,
+                    "server": cluster["server"],
+                    "config": json.dumps(
+                        {
+                            "tlsClientConfig": {
+                                "caData": cluster["certificate-authority-data"],
+                                "certData": user["client-certificate-data"],
+                                "keyData": user["client-key-data"],
+                            },
+                        }
+                    ),
+                },
+            }
+        )
+
+
+@kopf.on.event(
+    "v1",
+    "secrets",
+    labels = { "argocd.argoproj.io/secret-type": "cluster" },
+    annotations = { f"{settings.annotation_prefix}/kubeconfig-secret": kopf.PRESENT }
+)
+async def handle_argocd_cluster_secret_event(type, name, namespace, meta, **kwargs):
+    """
+    Executes whenever an event occurs for an Argo cluster secret.
+
+    Ensures that the referenced kubeconfig secret still exists and removes it if not.
+    """
+    # type is None for events that are fired on resume, which is all we want to respond to
+    if not type:
+        annotation = f"{settings.annotation_prefix}/kubeconfig-secret"
+        secret_namespace, secret_name = meta["annotations"][annotation].split("/", maxsplit = 1)
+        ekresource = await ek_client.api("v1").resource("secrets")
+        try:
+            _ = await ekresource.fetch(secret_name, namespace = secret_namespace)
+        except ApiError as exc:
+            if exc.status_code == 404:
+                _ = await ekresource.delete(name, namespace = namespace)
+            else:
+                raise
 
 
 def addon_handler(register_fn, **kwargs):
