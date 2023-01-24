@@ -23,14 +23,3 @@ def mergeconcat(defaults, *overrides):
         else:
             return overrides if overrides is not None else defaults
     return functools.reduce(mergeconcat2, overrides, defaults)
-
-
-def check_condition(obj: t.Dict[str, t.Any], name: str) -> bool:
-    """
-    Returns True if the specified condition exists and is True for the given object,
-    False otherwise.
-    """
-    return any(
-        condition["type"] == name and condition["status"] == "True"
-        for condition in obj.get("status", {}).get("conditions", [])
-    )

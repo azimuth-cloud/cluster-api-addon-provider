@@ -8,7 +8,8 @@ from easykube.kubernetes.client import AsyncClient
 from kube_custom_resource import schema
 
 from ...template import Loader
-from .base import EphemeralChartAddon, AddonSpec
+from .base import AddonSpec
+from .helm_release import ChartInfo, HelmRelease
 
 
 # Type variable for forward references to the HelmRelease type
@@ -168,6 +169,21 @@ class ManifestsSpec(AddonSpec):
     """
     Specification for a set of manifests to be deployed onto the target cluster.
     """
+    target_namespace: constr(regex = r"^[a-z0-9-]+$") = Field(
+        ...,
+        description = "The namespace on the target cluster to make the release in."
+    )
+    release_name: t.Optional[constr(regex = r"^[a-z0-9-]+$")] = Field(
+        None,
+        description = "The name of the release. Defaults to the name of the resource."
+    )
+    release_timeout: t.Optional[schema.IntOrString] = Field(
+        None,
+        description = (
+            "The time to wait for components to become ready. "
+            "If not given, the default timeout for the operator will be used."
+        )
+    )
     manifest_sources: t.List[ManifestSource] = Field(
         default_factory = list,
         description = "The manifest sources for the release."
@@ -175,7 +191,7 @@ class ManifestsSpec(AddonSpec):
 
 
 class Manifests(
-    EphemeralChartAddon,
+    HelmRelease,
     plural_name = "manifests",
     subresources = {"status": {}},
     printer_columns = [
@@ -238,6 +254,37 @@ class Manifests(
                 return True
         else:
             return False
+
+    def get_chart_info(self) -> ChartInfo:
+        """
+        Returns the chart to use for the Helm release.
+        """
+        return ChartInfo(
+            repo = "https://charts.helm.sh/incubator",
+            name = "raw",
+            version = "0.2.5"
+        )
+
+    async def get_values(
+        self,
+        template_loader: Loader,
+        ek_client: AsyncClient,
+        cluster: t.Dict[str, t.Any],
+        infra_cluster: t.Dict[str, t.Any],
+        cloud_identity: t.Optional[t.Dict[str, t.Any]]
+    ) -> t.Dict[str, t.Any]:
+        return {
+            "resources": [
+                resource
+                async for resource in self.get_resources(
+                    template_loader,
+                    ek_client,
+                    cluster,
+                    infra_cluster,
+                    cloud_identity
+                )
+            ]
+        }
 
     async def get_resources(
         self,

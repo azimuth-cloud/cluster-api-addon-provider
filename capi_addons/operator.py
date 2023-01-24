@@ -1,25 +1,19 @@
-import asyncio
 import base64
-import contextlib
 import functools
 import hashlib
 import json
 import logging
 import sys
-import tempfile
 
 import kopf
 
 import yaml
 
-from easykube import Configuration, ApiError, resources as k8s
+from easykube import Configuration, ApiError
 
 from kube_custom_resource import CustomResourceRegistry
 
-from pyhelm3 import Client as HelmClient
-from pyhelm3 import errors as helm_errors
-
-from . import models, template, utils
+from . import models, template
 from .models import v1alpha1 as api
 from .config import settings
 
@@ -197,37 +191,6 @@ def addon_handler(register_fn, **kwargs):
     return decorator
 
 
-@contextlib.asynccontextmanager
-async def clients_for_cluster(kubeconfig_secret):
-    """
-    Context manager that yields a tuple of (easykube client, Helm client) configured to
-    target the given Cluster API cluster.
-    """
-    # We pass a Helm client that is configured for the target cluster
-    with tempfile.NamedTemporaryFile() as kubeconfig:
-        kubeconfig_data = base64.b64decode(kubeconfig_secret.data["value"])
-        kubeconfig.write(kubeconfig_data)
-        kubeconfig.flush()
-        # Get an easykube client for the target cluster
-        ek_client_target = (
-            Configuration
-                .from_kubeconfig_data(kubeconfig_data, json_encoder = pydantic_encoder)
-                .async_client(default_field_manager = settings.easykube_field_manager)
-        )
-        # Get a Helm client for the target cluster
-        helm_client = HelmClient(
-            default_timeout = settings.helm_client.default_timeout,
-            executable = settings.helm_client.executable,
-            history_max_revisions = settings.helm_client.history_max_revisions,
-            insecure_skip_tls_verify = settings.helm_client.insecure_skip_tls_verify,
-            kubeconfig = kubeconfig.name,
-            unpack_directory = settings.helm_client.unpack_directory
-        )
-        # Yield the clients as a tuple
-        async with ek_client_target:
-            yield (ek_client_target, helm_client)
-
-
 async def fetch_ref(ref, default_namespace):
     """
     Returns the object that is referred to by a ref.
@@ -236,47 +199,18 @@ async def fetch_ref(ref, default_namespace):
     return await resource.fetch(ref["name"], namespace = ref.get("namespace", default_namespace))
 
 
-async def until_deleted(addon):
-    """
-    Runs until the given addon is deleted.
-
-    Used as a circuit-breaker to stop an in-progress install/upgrade when an addon is deleted.
-    """
-    ekapi = ek_client.api(addon.api_version)
-    resource = await ekapi.resource(addon._meta.plural_name)
-    while True:
-        try:
-            initial, events = await resource.watch_one(
-                addon.metadata.name,
-                namespace = addon.metadata.namespace
-            )
-            if initial and initial["metadata"].get("deletionTimestamp"):
-                return
-            async for event in events:
-                if event["object"]["metadata"].get("deletionTimestamp"):
-                    return
-        except asyncio.CancelledError:
-            return
-        except Exception:
-            continue
-
-
 @addon_handler(kopf.on.create)
 # Run when the annotations are updated as well as the spec
 # This means that when we change an annotation in response to a configmap or secret being
 # changed, the upgrade logic will be executed for the new configmap or secret content
 @addon_handler(kopf.on.update, field = "metadata.annotations")
 @addon_handler(kopf.on.update, field = "spec")
-async def handle_addon_updated(addon, **kwargs):
+@addon_handler(kopf.on.resume)
+async def handle_addon_updated(addon: api.Addon, **kwargs):
     """
     Executes whenever an addon is created or the annotations or spec of an addon are updated.
 
-    Every type of addon eventually ends up as a Helm release on the target cluster as we
-    want release semantics even if the manifests are not rendered by Helm - in particular
-    we want to identify and remove resources that are no longer part of the addon.
-
-    For non-Helm addons, this is done by turning the manifests into an "ephemeral chart"
-    which is rendered and then disposed.
+    Each addon maps to an Argo Application object targetting the specified cluster.
     """
     try:
         # Make sure the status has been initialised at the earliest possible opportunity
@@ -293,10 +227,9 @@ async def handle_addon_updated(addon, **kwargs):
         # Ensure that the cluster is in a suitable state
         # For bootstrap addons, just wait for the control plane to be initialised
         # For non-bootstrap addons, wait for the cluster to be ready
-        ready = utils.check_condition(
-            cluster,
-            "ControlPlaneInitialized" if addon.spec.bootstrap else "Ready"
-        )
+        condition = "ControlPlaneInitialized" if addon.spec.bootstrap else "Ready"
+        conditions = cluster.get("status", {}).get("conditions", [])
+        ready = any(c["type"] == condition and c["status"] == "True" for c in conditions)
         if not ready:
             raise kopf.TemporaryError(
                 f"cluster '{addon.spec.cluster_name}' is not ready",
@@ -314,113 +247,33 @@ async def handle_addon_updated(addon, **kwargs):
             cloud_identity = await fetch_ref(id_ref, cluster.metadata.namespace)
         else:
             cloud_identity = None
-        # The kubeconfig for the cluster is in a secret
-        secret = await k8s.Secret(ek_client).fetch(
-            f"{cluster.metadata.name}-kubeconfig",
-            namespace = cluster.metadata.namespace
+        # Install or update the addon
+        await addon.install_or_upgrade(
+            template_loader,
+            ek_client,
+            cluster,
+            infra_cluster,
+            cloud_identity
         )
-        # Get easykube and Helm clients for the target cluster and use them to deploy the addon
-        async with clients_for_cluster(secret) as (ek_client_target, helm_client):
-            # If the addon is deleted while an install or upgrade is in progress, cancel it
-            install_upgrade_task = asyncio.create_task(
-                addon.install_or_upgrade(
-                    template_loader,
-                    ek_client,
-                    ek_client_target,
-                    helm_client,
-                    cluster,
-                    infra_cluster,
-                    cloud_identity
-                )
-            )
-            wait_for_delete_task = asyncio.create_task(until_deleted(addon))
-            done, pending = await asyncio.wait(
-                { install_upgrade_task, wait_for_delete_task },
-                return_when = asyncio.FIRST_COMPLETED
-            )
-            # Cancel the pending tasks and give them a chance to clean up
-            for task in pending:
-                task.cancel()
-                try:
-                    _ = await task
-                except asyncio.CancelledError:
-                    continue
-            # Ensure that any exceptions from the completed tasks are raised
-            for task in done:
-                _ = await task
-    # Handle expected errors by converting them to kopf errors
-    # This suppresses the stack trace in logs/events
-    # Let unexpected errors bubble without suppressing the stack trace so they can be debugged
     except ApiError as exc:
         if exc.status_code in {404, 409}:
             raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
         else:
             raise
-    except (
-        helm_errors.ConnectionError,
-        helm_errors.CommandCancelledError
-     ) as exc:
-        # Assume connection errors are temporary
-        raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
-    except (
-        helm_errors.ChartNotFoundError,
-        helm_errors.FailedToRenderChartError,
-        helm_errors.ResourceAlreadyExistsError
-    ) as exc:
-        # These are permanent errors that can only be resolved by changing the spec
-        addon.set_phase(api.AddonPhase.FAILED, str(exc))
-        await addon.save_status(ek_client)
-        raise kopf.PermanentError(str(exc))
 
 
 @addon_handler(kopf.on.delete)
-async def handle_addon_deleted(addon, **kwargs):
+async def handle_addon_deleted(addon: api.Addon, **kwargs):
     """
     Executes whenever an addon is deleted.
     """
     try:
-        ekapi = await ek_client.api_preferred_version("cluster.x-k8s.io")
-        resource = await ekapi.resource("clusters")
-        cluster = await resource.fetch(
-            addon.spec.cluster_name,
-            namespace = addon.metadata.namespace
-        )
+        await addon.uninstall(ek_client)
     except ApiError as exc:
-        # If the cluster does not exist, we are done
-        if exc.status_code == 404:
-            return
-        else:
-            raise
-    else:
-        # If the cluster is deleting, there is nothing for us to do
-        if cluster.status.phase == "Deleting":
-            return
-    try:
-        secret = await k8s.Secret(ek_client).fetch(
-            f"{cluster.metadata.name}-kubeconfig",
-            namespace = cluster.metadata.namespace
-        )
-    except ApiError as exc:
-        # If the cluster does not exist, we are done
-        if exc.status_code == 404:
-            return
-        else:
-            raise
-    clients = clients_for_cluster(secret)
-    async with clients as (ek_client_target, helm_client):
-        try:
-            await addon.uninstall(ek_client, ek_client_target, helm_client)
-        except ApiError as exc:
-            if exc.status_code == 409:
-                raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
-            else:
-                raise
-        except helm_errors.ReleaseNotFoundError:
-            # If the release doesn't exist, we are done
-            return
-        except helm_errors.ConnectionError as exc:
-            # Assume connection errors are temporary
+        if exc.status_code in {404, 409}:
             raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+        else:
+            raise
 
 
 def compute_checksum(data):
