@@ -1,8 +1,9 @@
+import json
 import typing as t
 
 import kopf
 
-from pydantic import Field, constr
+from pydantic import Field, ValidationError, constr, validator
 
 from easykube import ApiError
 from easykube.kubernetes.client import AsyncClient
@@ -80,6 +81,18 @@ class ArgoApplicationStatus(AddonStatus):
         description = "The reason for entering a failed phase."
     )
 
+    @validator("phase", pre = True, always = True)
+    def validate_phase(cls, v):
+        """
+        Allow migration from legacy phases by returning unknown.
+        """
+        if isinstance(v, ArgoApplicationPhase):
+            return v
+        try:
+            return ArgoApplicationPhase(v)
+        except ValueError:
+            return ArgoApplicationPhase.UNKNOWN
+
 
 class ArgoApplication(Addon, abstract = True):
     """
@@ -123,6 +136,21 @@ class ArgoApplication(Addon, abstract = True):
         """
         raise NotImplementedError
 
+    def _sync_options_from_annotation(self) -> t.Optional[ArgoApplicationSyncOptions]:
+        """
+        Parses the sync options from the supported annotation, if present.
+        """
+        annotation = f"{settings.annotation_prefix}/sync-options"
+        annotation_value_text = self.metadata.annotations.get(annotation, "")
+        try:
+            annotation_value = json.loads(annotation_value_text)
+        except json.JSONDecodeError:
+            return None
+        try:
+            return ArgoApplicationSyncOptions(**annotation_value)
+        except ValidationError:
+            return None
+
     async def install_or_upgrade(
         self,
         template_loader: Loader,
@@ -131,6 +159,9 @@ class ArgoApplication(Addon, abstract = True):
         infra_cluster: t.Dict[str, t.Any],
         cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ):
+        # We also support specifying sync options using an annotation, for compatibility reasons
+        # So see if the annotation is present and whether it parses
+        sync_opts_annotation = self._sync_options_from_annotation()
         # Decide what sync options to use
         sync_options = [
             # This prevents Argo syncing large charts over and over
@@ -139,7 +170,10 @@ class ArgoApplication(Addon, abstract = True):
             # Make sure to create namespaces
             "CreateNamespace=true",
         ]
-        if self.spec.sync_options.server_side_apply:
+        if (
+            self.spec.sync_options.server_side_apply or
+            (sync_opts_annotation and sync_opts_annotation.server_side_apply)
+        ):
             sync_options.append("ServerSideApply=true")
         # Ensure the corresponding Argo application is up-to-date
         _ = await ek_client.apply_object(
