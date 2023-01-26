@@ -5,25 +5,6 @@ from pydantic import Field, AnyHttpUrl, conint, constr, validator
 from configomatic import Configuration as BaseConfiguration, Section, LoggingConfiguration
 
 
-class HelmClientConfiguration(Section):
-    """
-    Configuration for the Helm client.
-    """
-    #: The default timeout to use with Helm releases
-    #: Can be an integer number of seconds or a duration string like 5m, 5h
-    default_timeout: t.Union[int, constr(min_length = 1)] = "1h"
-    #: The executable to use
-    #: By default, we assume Helm is on the PATH
-    executable: constr(min_length = 1) = "helm"
-    #: The maximum number of revisions to retain in the history of releases
-    history_max_revisions: int = 10
-    #: Indicates whether to verify TLS when pulling charts
-    insecure_skip_tls_verify: bool = False
-    #: The directory to use for unpacking charts
-    #: By default, the system temporary directory is used
-    unpack_directory: t.Optional[str] = None
-
-
 class ManifestsHelmChartConfiguration(Section):
     """
     Configuration for the Helm chart to use for manifests resources.
@@ -101,9 +82,6 @@ class Configuration(BaseConfiguration):
 
     #: The Argo CD configuration
     argocd: ArgoCDConfiguration = Field(default_factory = ArgoCDConfiguration)
-
-    #: The Helm client configuration
-    helm_client: HelmClientConfiguration = Field(default_factory = HelmClientConfiguration)
 
     #: Label indicating that an addon belongs to a cluster
     cluster_label: constr(min_length = 1) = None

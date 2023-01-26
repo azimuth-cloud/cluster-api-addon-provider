@@ -20,10 +20,10 @@ class ArgoApplicationSyncOptions(schema.BaseModel):
     Model for sync options for the Argo application.
     """
     server_side_apply: bool = Field(
-        False,
+        True,
         description = (
-            "Indicates whether to use server-side apply (default false). "
-            "May be required for applications with large objects, e.g. CRDs."
+            "Indicates whether to use server-side apply (default true). "
+            "Server-side apply may not be usable with some resources."
         )
     )
 
@@ -171,8 +171,8 @@ class ArgoApplication(Addon, abstract = True):
             "CreateNamespace=true",
         ]
         if (
-            self.spec.sync_options.server_side_apply or
-            (sync_opts_annotation and sync_opts_annotation.server_side_apply)
+            self.spec.sync_options.server_side_apply and
+            (not sync_opts_annotation or sync_opts_annotation.server_side_apply)
         ):
             sync_options.append("ServerSideApply=true")
         # Ensure the corresponding Argo application is up-to-date
