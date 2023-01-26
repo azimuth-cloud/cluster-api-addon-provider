@@ -1,8 +1,10 @@
+import asyncio
 import base64
 import functools
 import hashlib
 import json
 import logging
+import random
 import sys
 
 import kopf
@@ -81,13 +83,16 @@ async def handle_kubeconfig_secret_event(type, body, name, namespace, meta, **kw
         return
     # Get the Cluster API cluster name from the labels
     cluster_name = meta["labels"]["cluster.x-k8s.io/cluster-name"]
-    argo_cluster_name = f"clusterapi-{namespace}-{cluster_name}"
+    argo_cluster_name = settings.argocd.cluster_template.format(
+        namespace = namespace,
+        name = cluster_name
+    )
     if type == "DELETED":
         # When the kubeconfig secret is deleted, remove the Argo secret
         ekresource = await ek_client.api("v1").resource("secrets")
         _ = await ekresource.delete(
             argo_cluster_name,
-            namespace = settings.argocd_namespace
+            namespace = settings.argocd.namespace
         )
     else:
         # Extract the kubeconfig from the secret and parse it
@@ -118,7 +123,7 @@ async def handle_kubeconfig_secret_event(type, body, name, namespace, meta, **kw
                 "kind": "Secret",
                 "metadata": {
                     "name": argo_cluster_name,
-                    "namespace": settings.argocd_namespace,
+                    "namespace": settings.argocd.namespace,
                     "labels": {
                         "argocd.argoproj.io/secret-type": "cluster",
                     },
@@ -276,6 +281,50 @@ async def handle_addon_deleted(addon: api.Addon, **kwargs):
             raise
 
 
+def on_event(*args, **kwargs):
+    """
+    Decorator that registers an event handler with kopf, with retry + exponential backoff.
+
+    The events will retry until they succeed, unless a permanent error is raised.
+
+    If a temporary error is raised, the delay from that is respected.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def handler(name, namespace, **kwargs):
+            retries = 0
+            while True:
+                try:
+                    return await func(
+                        name = name,
+                        namespace = namespace,
+                        retries = retries,
+                        **kwargs
+                    )
+                except kopf.PermanentError:
+                    raise
+                except kopf.TemporaryError as exc:
+                    logger.error(
+                        f"[{namespace}/{name}] "
+                        f"Handler '{func.__name__}' failed temporarily: {str(exc)}"
+                    )
+                    await asyncio.sleep(exc.delay)
+                except Exception:
+                    sleep_duration = min(
+                        settings.events_retry.backoff * 2 ** retries,
+                        settings.events_retry.max_interval
+                    )
+                    logger.exception(
+                        f"[{namespace}/{name}] "
+                        f"Handler '{func.__name__}' raised an exception - "
+                        f"retrying after {sleep_duration}s"
+                    )
+                    await asyncio.sleep(sleep_duration)
+                retries = retries + 1
+        return kopf.on.event(*args, **kwargs)(handler)
+    return decorator
+
+
 def compute_checksum(data):
     """
     Compute the checksum of the given data from a configmap or secret.
@@ -305,7 +354,7 @@ async def annotate_addon(addon, annotation, value):
             raise
 
 
-@kopf.on.event("configmap", labels = { settings.watch_label: kopf.PRESENT })
+@on_event("configmap", labels = { settings.watch_label: kopf.PRESENT })
 async def handle_configmap_event(type, name, namespace, body, **kwargs):
     """
     Executes every time a configmap is changed.
@@ -331,7 +380,7 @@ async def handle_configmap_event(type, name, namespace, body, **kwargs):
                 )
 
 
-@kopf.on.event("secret", labels = { settings.watch_label: kopf.PRESENT })
+@on_event("secret", labels = { settings.watch_label: kopf.PRESENT })
 async def handle_secret_event(name, namespace, body, **kwargs):
     """
     Executes every time a secret is changed.
@@ -355,3 +404,39 @@ async def handle_secret_event(name, namespace, body, **kwargs):
                     f"{settings.secret_annotation_prefix}/{name}",
                     annotation
                 )
+
+
+@on_event(
+    settings.argocd.api_version,
+    "application",
+    annotations = {
+        f"{settings.annotation_prefix}/{settings.argocd.owner_annotation}": kopf.PRESENT,
+    }
+)
+async def handle_application_event(type, body, annotations, **kwargs):
+    """
+    Executes every time an Argo application is changed.
+    """
+    annotation = f"{settings.annotation_prefix}/{settings.argocd.owner_annotation}"
+    plural_name, addon_namespace, addon_name = annotations[annotation].split(":")
+    ekapi = await ek_client.api_preferred_version(settings.api_group)
+    ekresource = await ekapi.resource(plural_name)
+    try:
+        addon_data = await ekresource.fetch(addon_name, namespace = addon_namespace)
+    except ApiError as exc:
+        if exc.status_code == 404:
+            return
+        else:
+            raise
+    else:
+        addon = registry.get_model_instance(addon_data)
+    try:
+        if type == "DELETED":
+            await addon.argo_application_deleted(ek_client, body)
+        else:
+            await addon.argo_application_updated(ek_client, body)
+    except ApiError as exc:
+        if exc.status_code in {404, 409}:
+            raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+        else:
+            raise

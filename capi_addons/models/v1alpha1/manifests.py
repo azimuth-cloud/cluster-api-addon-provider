@@ -7,8 +7,9 @@ from easykube.kubernetes.client import AsyncClient
 
 from kube_custom_resource import schema
 
+from ...config import settings
 from ...template import Loader
-from .base import AddonSpec
+from .argo_application import ArgoApplicationSpec
 from .helm_release import ChartInfo, HelmRelease
 
 
@@ -165,24 +166,13 @@ ManifestSource = schema.StructuralUnion[
 ManifestSource.__doc__ = "Union type for the possible manifest sources."
 
 
-class ManifestsSpec(AddonSpec):
+class ManifestsSpec(ArgoApplicationSpec):
     """
     Specification for a set of manifests to be deployed onto the target cluster.
     """
-    target_namespace: constr(regex = r"^[a-z0-9-]+$") = Field(
-        ...,
-        description = "The namespace on the target cluster to make the release in."
-    )
     release_name: t.Optional[constr(regex = r"^[a-z0-9-]+$")] = Field(
         None,
         description = "The name of the release. Defaults to the name of the resource."
-    )
-    release_timeout: t.Optional[schema.IntOrString] = Field(
-        None,
-        description = (
-            "The time to wait for components to become ready. "
-            "If not given, the default timeout for the operator will be used."
-        )
     )
     manifest_sources: t.List[ManifestSource] = Field(
         default_factory = list,
@@ -220,11 +210,6 @@ class Manifests(
             "type": "string",
             "jsonPath": ".status.phase",
         },
-        {
-            "name": "Revision",
-            "type": "integer",
-            "jsonPath": ".status.revision",
-        },
     ]
 ):
     """
@@ -260,9 +245,9 @@ class Manifests(
         Returns the chart to use for the Helm release.
         """
         return ChartInfo(
-            repo = "https://charts.helm.sh/incubator",
-            name = "raw",
-            version = "0.2.5"
+            repo = settings.manifests_helm_chart.repo,
+            name = settings.manifests_helm_chart.name,
+            version = settings.manifests_helm_chart.version
         )
 
     async def get_values(

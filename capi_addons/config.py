@@ -1,6 +1,6 @@
 import typing as t
 
-from pydantic import Field, conint, constr, validator
+from pydantic import Field, AnyHttpUrl, conint, constr, validator
 
 from configomatic import Configuration as BaseConfiguration, Section, LoggingConfiguration
 
@@ -22,6 +22,46 @@ class HelmClientConfiguration(Section):
     #: The directory to use for unpacking charts
     #: By default, the system temporary directory is used
     unpack_directory: t.Optional[str] = None
+
+
+class ManifestsHelmChartConfiguration(Section):
+    """
+    Configuration for the Helm chart to use for manifests resources.
+    """
+    #: The Helm repository for the chart
+    repo: AnyHttpUrl = "https://charts.helm.sh/incubator"
+    #: The chart name
+    name: constr(min_length = 1) = "raw"
+    #: The chart version
+    version: constr(min_length = 1) = "0.2.5"
+
+
+class ArgoCDConfiguration(Section):
+    """
+    Configuration for the Argo CD integration.
+    """
+    #: The API version to use for Argo
+    api_version: constr(min_length = 1) = "argoproj.io/v1alpha1"
+    #: The namespace that Argo CD is running in
+    namespace: constr(min_length = 1) = "argocd"
+    #: The template to use for Argo cluster names
+    cluster_template: constr(min_length = 1) = "clusterapi-{namespace}-{name}"
+    #: Indicates whether to use self-healing for applications
+    self_heal_applications: bool = True
+    #: The finalizer indicating that an application should wait for resources to be deleted
+    resource_deletion_finalizer: constr(min_length = 1) = "resources-finalizer.argocd.argoproj.io"
+    #: The owner annotation, used to identify the addon that owns an Argo app
+    owner_annotation: constr(min_length = 1) = "owner-reference"
+
+
+class EventsRetryConfiguration(Section):
+    """
+    Configuration for the retries of the event handling.
+    """
+    #: The backoff in seconds
+    backoff: conint(gt = 0) = 1
+    #: The maximum wait time between retries
+    max_interval: conint(gt = 0) = 120
 
 
 class Configuration(BaseConfiguration):
@@ -48,11 +88,19 @@ class Configuration(BaseConfiguration):
     #: The field manager name to use for server-side apply
     easykube_field_manager: constr(min_length = 1) = "cluster-api-addon-provider"
 
-    #: The namespace that Argo CD is running in
-    argocd_namespace: constr(min_length = 1) = "argocd"
-
     #: The delay to use for temporary errors by default
     temporary_error_delay: conint(gt = 0) = 15
+
+    #: The retry configuration for events
+    events_retry: EventsRetryConfiguration = Field(default_factory = EventsRetryConfiguration)
+
+    #: The chart to use for manifests resources
+    manifests_helm_chart: ManifestsHelmChartConfiguration = Field(
+        default_factory = ManifestsHelmChartConfiguration
+    )
+
+    #: The Argo CD configuration
+    argocd: ArgoCDConfiguration = Field(default_factory = ArgoCDConfiguration)
 
     #: The Helm client configuration
     helm_client: HelmClientConfiguration = Field(default_factory = HelmClientConfiguration)

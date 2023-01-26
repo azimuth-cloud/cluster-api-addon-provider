@@ -58,7 +58,7 @@ class Addon(CustomResource, abstract = True):
             {
                 # Include the resource version for optimistic concurrency
                 "metadata": { "resourceVersion": self.metadata.resource_version },
-                "status": self.status.dict(exclude_defaults = True),
+                "status": self.status.dict(),
             },
             namespace = self.metadata.namespace
         )
