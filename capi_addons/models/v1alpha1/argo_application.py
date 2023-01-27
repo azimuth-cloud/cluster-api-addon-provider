@@ -144,6 +144,19 @@ class ArgoApplication(Addon, abstract = True):
         """
         raise NotImplementedError
 
+    def _argo_app_name(self) -> str:
+        """
+        Returns the Argo app name for this object.
+        """
+        return settings.argocd.app_name_template.format(
+            type = type(self).__name__.lower(),
+            namespace = self.metadata.namespace,
+            name = self.metadata.name,
+            # In order to ensure uniqueness, we include the first 8 characters of the UID
+            # Otherwise, ns-bob/cluster-1 and ns/bob-cluster-1 make the same app name
+            id = self.metadata.uid[:8]
+        )
+
     def _project_from_annotation(self) -> t.Optional[str]:
         """
         Returns the project from the annotation, if present.
@@ -217,11 +230,7 @@ class ArgoApplication(Addon, abstract = True):
                 "apiVersion": settings.argocd.api_version,
                 "kind": "Application",
                 "metadata": {
-                    "name": "{type}-{namespace}-{name}".format(
-                        type = type(self).__name__.lower(),
-                        namespace = self.metadata.namespace,
-                        name = self.metadata.name
-                    ),
+                    "name": self._argo_app_name(),
                     "namespace": settings.argocd.namespace,
                     "labels": {
                         "app.kubernetes.io/managed-by": "cluster-api-addon-provider",
@@ -239,9 +248,13 @@ class ArgoApplication(Addon, abstract = True):
                 },
                 "spec": {
                     "destination": {
-                        "name": settings.argocd.cluster_template.format(
-                            namespace = self.metadata.namespace,
-                            name = self.spec.cluster_name
+                        "name": cluster.metadata.get("annotations", {}).get(
+                            f"{settings.annotation_prefix}/argo-cluster-name",
+                            settings.argocd.cluster_name_template.format(
+                                namespace = cluster.metadata.namespace,
+                                name = cluster.metadata.name,
+                                id = cluster.metadata.uid[:8]
+                            )
                         ),
                         "namespace": self.spec.target_namespace,
                     },
@@ -271,13 +284,8 @@ class ArgoApplication(Addon, abstract = True):
             await self.save_status(ek_client)
         # Get the app
         ekapps = await ek_client.api(settings.argocd.api_version).resource("applications")
-        app_name = "{type}-{namespace}-{name}".format(
-            type = type(self).__name__.lower(),
-            namespace = self.metadata.namespace,
-            name = self.metadata.name
-        )
         try:
-            app = await ekapps.fetch(app_name, namespace = settings.argocd.namespace)
+            app = await ekapps.fetch(self._argo_app_name(), namespace = settings.argocd.namespace)
         except ApiError as exc:
             if exc.status_code == 404:
                 # If the app doesn't exist, we are done

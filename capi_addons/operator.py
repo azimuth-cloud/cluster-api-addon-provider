@@ -72,7 +72,51 @@ async def on_cleanup(**kwargs):
     await ek_client.aclose()
 
 
-@kopf.on.event("v1", "secrets", field = "type", value = "cluster.x-k8s.io/secret")
+def on_event(*args, **kwargs):
+    """
+    Decorator that registers an event handler with kopf, with retry + exponential backoff.
+
+    The events will retry until they succeed, unless a permanent error is raised.
+
+    If a temporary error is raised, the delay from that is respected.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def handler(name, namespace, **kwargs):
+            retries = 0
+            while True:
+                try:
+                    return await func(
+                        name = name,
+                        namespace = namespace,
+                        retries = retries,
+                        **kwargs
+                    )
+                except kopf.PermanentError:
+                    raise
+                except kopf.TemporaryError as exc:
+                    logger.error(
+                        f"[{namespace}/{name}] "
+                        f"Handler '{func.__name__}' failed temporarily: {str(exc)}"
+                    )
+                    await asyncio.sleep(exc.delay)
+                except Exception:
+                    sleep_duration = min(
+                        settings.events_retry.backoff * 2 ** retries,
+                        settings.events_retry.max_interval
+                    )
+                    logger.exception(
+                        f"[{namespace}/{name}] "
+                        f"Handler '{func.__name__}' raised an exception - "
+                        f"retrying after {sleep_duration}s"
+                    )
+                    await asyncio.sleep(sleep_duration)
+                retries = retries + 1
+        return kopf.on.event(*args, **kwargs)(handler)
+    return decorator
+
+
+@on_event("v1", "secrets", field = "type", value = "cluster.x-k8s.io/secret")
 async def handle_kubeconfig_secret_event(type, body, name, namespace, meta, **kwargs):
     """
     Executes whenever an event occurs for a Cluster API secret.
@@ -84,71 +128,99 @@ async def handle_kubeconfig_secret_event(type, body, name, namespace, meta, **kw
         return
     # Get the Cluster API cluster name from the labels
     cluster_name = meta["labels"]["cluster.x-k8s.io/cluster-name"]
-    argo_cluster_name = settings.argocd.cluster_template.format(
-        namespace = namespace,
-        name = cluster_name
-    )
+    # If we are being deleted, remove all the secrets in the Argo namespace
+    # that are labelled as belonging to the cluster
+    # This means that the Argo secrets get deleted even if the cluster doesn't exist
     if type == "DELETED":
-        # When the kubeconfig secret is deleted, remove the Argo secret
-        ekresource = await ek_client.api("v1").resource("secrets")
-        _ = await ekresource.delete(
-            argo_cluster_name,
+        eksecrets = await ek_client.api("v1").resource("secrets")
+        await eksecrets.delete_all(
+            labels = {
+                settings.cluster_namespace_label: namespace,
+                settings.cluster_name_label: cluster_name,
+            },
             namespace = settings.argocd.namespace
         )
-    else:
-        # Extract the kubeconfig from the secret and parse it
-        kubeconfig_b64 = body["data"]["value"]
-        kubeconfig_bytes = base64.b64decode(kubeconfig_b64)
-        kubeconfig = yaml.safe_load(kubeconfig_bytes)
-        # Get the cluster and user information from the kubeconfig
-        context_name = kubeconfig["current-context"]
-        context = next(
-            c["context"]
-            for c in kubeconfig["contexts"]
-            if c["name"] == context_name
+        return
+    # Otherwise, ensure that the Argo secret exists for the cluster
+    ekcapi = await ek_client.api_preferred_version("cluster.x-k8s.io")
+    ekclusters = await ekcapi.resource("clusters")
+    try:
+        cluster = await ekclusters.fetch(cluster_name, namespace = namespace)
+    except ApiError as exc:
+        if exc.status_code == 404:
+            # This should never happen during normal operation and should stop the retries
+            raise kopf.PermanentError(str(exc))
+        else:
+            raise
+    # Derive the Argo cluster name
+    # We allow the cluster to override the Argo cluster name using an annotation
+    # If we are generating a name, then to ensure uniqueness we include the first
+    # 8 characters of the cluster UID, which should be sufficient randomness
+    argo_cluster_name_annotation = f"{settings.annotation_prefix}/argo-cluster-name"
+    argo_cluster_name = cluster.metadata.annotations.get(
+        argo_cluster_name_annotation,
+        settings.argocd.cluster_name_template.format(
+            namespace = cluster.metadata.namespace,
+            name = cluster.metadata.name,
+            id = cluster.metadata.uid[:8]
         )
-        cluster = next(
-            c["cluster"]
-            for c in kubeconfig["clusters"]
-            if c["name"] == context["cluster"]
-        )
-        user = next(
-            u["user"]
-            for u in kubeconfig["users"]
-            if u["name"] == context["user"]
-        )
-        # Write the secret for Argo CD to pick up
-        _ = await ek_client.apply_object(
-            {
-                "apiVersion": "v1",
-                "kind": "Secret",
-                "metadata": {
-                    "name": argo_cluster_name,
-                    "namespace": settings.argocd.namespace,
-                    "labels": {
-                        "argocd.argoproj.io/secret-type": "cluster",
-                    },
-                    # Annotate the secret with information about the Cluster API cluster
-                    "annotations": {
-                        f"{settings.annotation_prefix}/kubeconfig-secret": f"{namespace}/{name}",
-                    },
+    )
+    # Extract the kubeconfig from the secret and parse it
+    kubeconfig_b64 = body["data"]["value"]
+    kubeconfig_bytes = base64.b64decode(kubeconfig_b64)
+    kubeconfig = yaml.safe_load(kubeconfig_bytes)
+    # Get the cluster and user information from the kubeconfig
+    context_name = kubeconfig["current-context"]
+    kubeconfig_context = next(
+        c["context"]
+        for c in kubeconfig["contexts"]
+        if c["name"] == context_name
+    )
+    kubeconfig_cluster = next(
+        c["cluster"]
+        for c in kubeconfig["clusters"]
+        if c["name"] == kubeconfig_context["cluster"]
+    )
+    kubeconfig_user = next(
+        u["user"]
+        for u in kubeconfig["users"]
+        if u["name"] == kubeconfig_context["user"]
+    )
+    # Write the secret for Argo CD to pick up
+    await ek_client.apply_object(
+        {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": argo_cluster_name,
+                "namespace": settings.argocd.namespace,
+                "labels": {
+                    "argocd.argoproj.io/secret-type": "cluster",
+                    # Add the labels so we can identify the owning cluster for deletion later
+                    settings.cluster_namespace_label: cluster.metadata.namespace,
+                    settings.cluster_name_label: cluster.metadata.name,
                 },
-                "type": "Opaque",
-                "stringData": {
-                    "name": argo_cluster_name,
-                    "server": cluster["server"],
-                    "config": json.dumps(
-                        {
-                            "tlsClientConfig": {
-                                "caData": cluster["certificate-authority-data"],
-                                "certData": user["client-certificate-data"],
-                                "keyData": user["client-key-data"],
-                            },
-                        }
-                    ),
+                # Annotate the secret with information about the kubeconfig secret
+                "annotations": {
+                    f"{settings.annotation_prefix}/kubeconfig-secret": f"{namespace}/{name}",
                 },
-            }
-        )
+            },
+            "type": "Opaque",
+            "stringData": {
+                "name": argo_cluster_name,
+                "server": kubeconfig_cluster["server"],
+                "config": json.dumps(
+                    {
+                        "tlsClientConfig": {
+                            "caData": kubeconfig_cluster["certificate-authority-data"],
+                            "certData": kubeconfig_user["client-certificate-data"],
+                            "keyData": kubeconfig_user["client-key-data"],
+                        },
+                    }
+                ),
+            },
+        }
+    )
 
 
 @kopf.on.event(
@@ -169,10 +241,10 @@ async def handle_argocd_cluster_secret_event(type, name, namespace, meta, **kwar
         secret_namespace, secret_name = meta["annotations"][annotation].split("/", maxsplit = 1)
         ekresource = await ek_client.api("v1").resource("secrets")
         try:
-            _ = await ekresource.fetch(secret_name, namespace = secret_namespace)
+            await ekresource.fetch(secret_name, namespace = secret_namespace)
         except ApiError as exc:
             if exc.status_code == 404:
-                _ = await ekresource.delete(name, namespace = namespace)
+                await ekresource.delete(name, namespace = namespace)
             else:
                 raise
 
@@ -222,9 +294,9 @@ async def handle_addon_updated(addon: api.Addon, **kwargs):
         # Make sure the status has been initialised at the earliest possible opportunity
         await addon.init_status(ek_client)
         # Check that the cluster associated with the addon exists
-        ekapi = await ek_client.api_preferred_version("cluster.x-k8s.io")
-        resource = await ekapi.resource("clusters")
-        cluster = await resource.fetch(
+        ekcapi = await ek_client.api_preferred_version("cluster.x-k8s.io")
+        ekclusters = await ekcapi.resource("clusters")
+        cluster = await ekclusters.fetch(
             addon.spec.cluster_name,
             namespace = addon.metadata.namespace
         )
@@ -280,50 +352,6 @@ async def handle_addon_deleted(addon: api.Addon, **kwargs):
             raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
         else:
             raise
-
-
-def on_event(*args, **kwargs):
-    """
-    Decorator that registers an event handler with kopf, with retry + exponential backoff.
-
-    The events will retry until they succeed, unless a permanent error is raised.
-
-    If a temporary error is raised, the delay from that is respected.
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        async def handler(name, namespace, **kwargs):
-            retries = 0
-            while True:
-                try:
-                    return await func(
-                        name = name,
-                        namespace = namespace,
-                        retries = retries,
-                        **kwargs
-                    )
-                except kopf.PermanentError:
-                    raise
-                except kopf.TemporaryError as exc:
-                    logger.error(
-                        f"[{namespace}/{name}] "
-                        f"Handler '{func.__name__}' failed temporarily: {str(exc)}"
-                    )
-                    await asyncio.sleep(exc.delay)
-                except Exception:
-                    sleep_duration = min(
-                        settings.events_retry.backoff * 2 ** retries,
-                        settings.events_retry.max_interval
-                    )
-                    logger.exception(
-                        f"[{namespace}/{name}] "
-                        f"Handler '{func.__name__}' raised an exception - "
-                        f"retrying after {sleep_duration}s"
-                    )
-                    await asyncio.sleep(sleep_duration)
-                retries = retries + 1
-        return kopf.on.event(*args, **kwargs)(handler)
-    return decorator
 
 
 def compute_checksum(data):

@@ -28,7 +28,9 @@ class ArgoCDConfiguration(Section):
     #: The default project for Argo CD
     default_project: constr(min_length = 1) = "default"
     #: The template to use for Argo cluster names
-    cluster_template: constr(min_length = 1) = "clusterapi-{namespace}-{name}"
+    cluster_name_template: constr(min_length = 1) = "clusterapi-{namespace}-{name}-{id}"
+    # The template to use for Argo app names
+    app_name_template: constr(min_length = 1) = "{type}-{namespace}-{name}-{id}"
     #: Indicates whether to use self-healing for applications
     self_heal_applications: bool = True
     #: The finalizer indicating that an application should wait for resources to be deleted
@@ -83,8 +85,10 @@ class Configuration(BaseConfiguration):
     #: The Argo CD configuration
     argocd: ArgoCDConfiguration = Field(default_factory = ArgoCDConfiguration)
 
-    #: Label indicating that an addon belongs to a cluster
-    cluster_label: constr(min_length = 1) = None
+    #: Label indicating a cluster namespace
+    cluster_namespace_label: constr(min_length = 1) = None
+    #: Label indicating a cluster name
+    cluster_name_label: constr(min_length = 1) = None
     #: Label indicating the target namespace for the addon
     release_namespace_label: constr(min_length = 1) = None
     #: Label indicating the name of the release for the addon
@@ -100,9 +104,13 @@ class Configuration(BaseConfiguration):
     def default_annotation_prefix(cls, v, *, values, **kwargs):
         return v or values['api_group']
 
-    @validator("cluster_label", pre = True, always = True)
-    def default_cluster_label(cls, v, *, values, **kwargs):
-        return v or f"{values['api_group']}/cluster"
+    @validator("cluster_namespace_label", pre = True, always = True)
+    def default_cluster_namespace_label(cls, v, *, values, **kwargs):
+        return v or f"{values['api_group']}/cluster-namespace"
+
+    @validator("cluster_name_label", pre = True, always = True)
+    def default_cluster_name_label(cls, v, *, values, **kwargs):
+        return v or f"{values['api_group']}/cluster-name"
 
     @validator("release_namespace_label", pre = True, always = True)
     def default_release_namespace_label(cls, v, *, values, **kwargs):
