@@ -8,6 +8,8 @@ import sys
 
 import kopf
 
+import pydantic
+
 import yaml
 
 from easykube import Configuration, ApiError
@@ -409,16 +411,16 @@ async def handle_secret_event(name, namespace, body, **kwargs):
     settings.argocd.api_version,
     "application",
     annotations = {
-        f"{settings.annotation_prefix}/{settings.argocd.owner_annotation}": kopf.PRESENT,
+        f"{settings.annotation_prefix}/owner-reference": kopf.PRESENT,
     }
 )
 async def handle_application_event(type, body, annotations, **kwargs):
     """
     Executes every time an Argo application is changed.
     """
-    annotation = f"{settings.annotation_prefix}/{settings.argocd.owner_annotation}"
-    plural_name, addon_namespace, addon_name = annotations[annotation].split(":")
-    ekapi = await ek_client.api_preferred_version(settings.api_group)
+    annotation = f"{settings.annotation_prefix}/owner-reference"
+    api_group, plural_name, addon_namespace, addon_name = annotations[annotation].split(":")
+    ekapi = await ek_client.api_preferred_version(api_group)
     ekresource = await ekapi.resource(plural_name)
     try:
         addon_data = await ekresource.fetch(addon_name, namespace = addon_namespace)
@@ -427,8 +429,14 @@ async def handle_application_event(type, body, annotations, **kwargs):
             return
         else:
             raise
-    else:
+    try:
         addon = registry.get_model_instance(addon_data)
+    except (KeyError, pydantic.ValidationError) as exc:
+        # Not being able to find the model or validate the data is a permanent error
+        raise kopf.PermanentError(str(exc))
+    # If the addon is not an Argo application, ignore it
+    if not isinstance(addon, api.ArgoApplication):
+        return
     try:
         if type == "DELETED":
             await addon.argo_application_deleted(ek_client, body)

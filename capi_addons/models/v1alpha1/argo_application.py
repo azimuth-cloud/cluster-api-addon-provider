@@ -1,4 +1,5 @@
 import json
+import re
 import typing as t
 
 import kopf
@@ -19,8 +20,8 @@ class ArgoApplicationSyncOptions(schema.BaseModel):
     """
     Model for sync options for the Argo application.
     """
-    server_side_apply: bool = Field(
-        True,
+    server_side_apply: t.Optional[bool] = Field(
+        None,
         description = (
             "Indicates whether to use server-side apply (default true). "
             "Server-side apply may not be usable with some resources."
@@ -36,9 +37,16 @@ class ArgoApplicationSpec(AddonSpec):
         ...,
         description = "The namespace on the target cluster to deploy the application in."
     )
+    project: t.Optional[constr(regex = r"^[a-z0-9-]+$")] = Field(
+        None,
+        description = (
+            "The Argo project to deploy the application in. "
+            "If not given, the default project will be used."
+        )
+    )
     sync_options: ArgoApplicationSyncOptions = Field(
         default_factory = ArgoApplicationSyncOptions,
-        description = "The sync options for the application."
+        description = "The Argo sync options for the application."
     )
 
 
@@ -136,6 +144,19 @@ class ArgoApplication(Addon, abstract = True):
         """
         raise NotImplementedError
 
+    def _project_from_annotation(self) -> t.Optional[str]:
+        """
+        Returns the project from the annotation, if present.
+        """
+        annotation = f"{settings.annotation_prefix}/project"
+        annotation_value = self.metadata.annotations.get(annotation, "")
+        # Check that the annotation value matches the same regex as the spec,
+        # otherwise it is as if it doesn't exist
+        if re.search(r"^[a-z0-9-]+$", annotation_value) is not None:
+            return annotation_value
+        else:
+            return None
+
     def _sync_options_from_annotation(self) -> t.Optional[ArgoApplicationSyncOptions]:
         """
         Parses the sync options from the supported annotation, if present.
@@ -159,10 +180,18 @@ class ArgoApplication(Addon, abstract = True):
         infra_cluster: t.Dict[str, t.Any],
         cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ):
-        # We also support specifying sync options using an annotation, for compatibility reasons
-        # So see if the annotation is present and whether it parses
-        sync_opts_annotation = self._sync_options_from_annotation()
+        # Decide what project to use
+        # We allow specifying the project as an annotation for compatibility reasons,
+        # but they value from the spec takes precedence if both are given
+        project = (
+            self.spec.project or
+            self._project_from_annotation() or
+            settings.argocd.default_project
+        )
         # Decide what sync options to use
+        # We support specifying sync options using an annotation for compatibility reasons,
+        # but values from the spec take precendence if they are given
+        sync_opts_annotation = self._sync_options_from_annotation()
         sync_options = [
             # This prevents Argo syncing large charts over and over
             # when only a small number of resources are out-of-sync
@@ -170,10 +199,17 @@ class ArgoApplication(Addon, abstract = True):
             # Make sure to create namespaces
             "CreateNamespace=true",
         ]
-        if (
-            self.spec.sync_options.server_side_apply and
-            (not sync_opts_annotation or sync_opts_annotation.server_side_apply)
+        if self.spec.sync_options.server_side_apply is not None:
+            if self.spec.sync_options.server_side_apply:
+                sync_options.append("ServerSideApply=true")
+        elif (
+            sync_opts_annotation
+            and sync_opts_annotation.server_side_apply is not None
         ):
+            if sync_opts_annotation.server_side_apply:
+                sync_options.append("ServerSideApply=true")
+        else:
+            # If server-side apply is not specified by the spec or annotation, default to true
             sync_options.append("ServerSideApply=true")
         # Ensure the corresponding Argo application is up-to-date
         _ = await ek_client.apply_object(
@@ -193,7 +229,8 @@ class ArgoApplication(Addon, abstract = True):
                     "annotations": {
                         # The annotation is used to identify the associated addon
                         # when an event is observed for the Argo application
-                        f"{settings.annotation_prefix}/{settings.argocd.owner_annotation}": (
+                        f"{settings.annotation_prefix}/owner-reference": (
+                            f"{settings.api_group}:"
                             f"{self._meta.plural_name}:"
                             f"{self.metadata.namespace}:"
                             f"{self.metadata.name}"
@@ -208,7 +245,7 @@ class ArgoApplication(Addon, abstract = True):
                         ),
                         "namespace": self.spec.target_namespace,
                     },
-                    "project": "default",
+                    "project": project,
                     "source": await self.get_argo_source(
                         template_loader,
                         ek_client,

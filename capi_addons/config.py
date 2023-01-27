@@ -25,14 +25,14 @@ class ArgoCDConfiguration(Section):
     api_version: constr(min_length = 1) = "argoproj.io/v1alpha1"
     #: The namespace that Argo CD is running in
     namespace: constr(min_length = 1) = "argocd"
+    #: The default project for Argo CD
+    default_project: constr(min_length = 1) = "default"
     #: The template to use for Argo cluster names
     cluster_template: constr(min_length = 1) = "clusterapi-{namespace}-{name}"
     #: Indicates whether to use self-healing for applications
     self_heal_applications: bool = True
     #: The finalizer indicating that an application should wait for resources to be deleted
     resource_deletion_finalizer: constr(min_length = 1) = "resources-finalizer.argocd.argoproj.io"
-    #: The owner annotation, used to identify the addon that owns an Argo app
-    owner_annotation: constr(min_length = 1) = "owner-reference"
 
 
 class EventsRetryConfiguration(Section):
