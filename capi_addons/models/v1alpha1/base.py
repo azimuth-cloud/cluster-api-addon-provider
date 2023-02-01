@@ -80,20 +80,26 @@ class Addon(CustomResource, abstract = True):
         Initialises the addon's metadata, ensuring owner references and labels are set.
         """
         previous_labels = dict(self.metadata.labels)
+        # Make sure that the cluster owns the addon
+        owner_references_updated = self.metadata.add_owner_reference(
+            cluster,
+            block_owner_deletion = True
+        )
         # Add a label for the cluster
         self.metadata.labels[settings.cluster_name_label] = cluster.metadata.name
         # Apply addon-specific labels
         self.metadata.labels.update(self.get_labels())
+        # Check if the labels changed
+        labels_updated = self.metadata.labels != previous_labels
         # Apply the patch if required
-        # Make sure there are no owner references as they don't play nice with Argo
-        if self.metadata.owner_references or self.metadata.labels != previous_labels:
+        if owner_references_updated or labels_updated:
             ekapi = ek_client.api(self.api_version)
             resource = await ekapi.resource(self._meta.plural_name)
             data = await resource.patch(
                 self.metadata.name,
                 {
                     "metadata": {
-                        "ownerReferences": [],
+                        "ownerReferences": self.metadata.owner_references,
                         "labels": self.metadata.labels,
                         # Include the resource version for optimistic concurrency
                         "resourceVersion": self.metadata.resource_version,

@@ -58,7 +58,7 @@ async def apply_settings(**kwargs):
     )
     try:
         for crd in registry:
-            await ek_client.apply_object(crd.kubernetes_resource())
+            await ek_client.apply_object(crd.kubernetes_resource(), force = True)
     except Exception:
         logger.exception("error applying CRDs - exiting")
         sys.exit(1)
@@ -157,7 +157,7 @@ async def handle_kubeconfig_secret_event(type, body, name, namespace, meta, **kw
     # If we are generating a name, then to ensure uniqueness we include the first
     # 8 characters of the cluster UID, which should be sufficient randomness
     argo_cluster_name_annotation = f"{settings.annotation_prefix}/argo-cluster-name"
-    argo_cluster_name = cluster.metadata.annotations.get(
+    argo_cluster_name = cluster.metadata.get("annotations", {}).get(
         argo_cluster_name_annotation,
         settings.argocd.cluster_name_template.format(
             namespace = cluster.metadata.namespace,
@@ -219,7 +219,8 @@ async def handle_kubeconfig_secret_event(type, body, name, namespace, meta, **kw
                     }
                 ),
             },
-        }
+        },
+        force = True
     )
 
 

@@ -157,12 +157,12 @@ class ArgoApplication(Addon, abstract = True):
             id = self.metadata.uid[:8]
         )
 
-    def _project_from_annotation(self) -> t.Optional[str]:
+    def _project_from_annotation(self, annotations: t.Dict[str, str]) -> t.Optional[str]:
         """
         Returns the project from the annotation, if present.
         """
         annotation = f"{settings.annotation_prefix}/project"
-        annotation_value = self.metadata.annotations.get(annotation, "")
+        annotation_value = annotations.get(annotation, "")
         # Check that the annotation value matches the same regex as the spec,
         # otherwise it is as if it doesn't exist
         if re.search(r"^[a-z0-9-]+$", annotation_value) is not None:
@@ -193,12 +193,14 @@ class ArgoApplication(Addon, abstract = True):
         infra_cluster: t.Dict[str, t.Any],
         cloud_identity: t.Optional[t.Dict[str, t.Any]]
     ):
-        # Decide what project to use
+        # Decide which project to use
         # We allow specifying the project as an annotation for compatibility reasons,
         # but they value from the spec takes precedence if both are given
+        # We also allow the cluster to specify the project as an annotation for all addons
         project = (
             self.spec.project or
-            self._project_from_annotation() or
+            self._project_from_annotation(self.metadata.annotations) or
+            self._project_from_annotation(cluster.metadata.get("annotations", {})) or
             settings.argocd.default_project
         )
         # Decide what sync options to use
@@ -274,7 +276,8 @@ class ArgoApplication(Addon, abstract = True):
                         "syncOptions": sync_options,
                     },
                 },
-            }
+            },
+            force = True
         )
 
     async def uninstall(self, ek_client: AsyncClient):
