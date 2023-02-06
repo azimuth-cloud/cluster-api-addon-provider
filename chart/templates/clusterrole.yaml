@@ -75,3 +75,12 @@ rules:
       - list
       - watch
       - get
+  # We need to be able to watch Argo applications in all namespaces
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - applications
+    verbs:
+      - list
+      - watch
+      - get
