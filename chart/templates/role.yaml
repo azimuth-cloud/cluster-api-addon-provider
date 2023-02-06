@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cluster-api-addon-provider.fullname" . }}
+  # This role needs to apply to the Argo CD namespace
+  namespace: {{ .Values.config | dig "argocd" "namespace" "argocd" }}
+  labels: {{ include "cluster-api-addon-provider.labels" . | nindent 4 }}
+rules:
+  # We need to be able to manipulate secrets in the Argo CD namespace
+  # in order to register clusters
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - "*"
+  # We need to be able to make applications
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - applications
+    verbs:
+      - "*"
