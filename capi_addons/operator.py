@@ -260,7 +260,8 @@ async def handle_addon_updated(addon, **kwargs):
     except (
         helm_errors.ChartNotFoundError,
         helm_errors.FailedToRenderChartError,
-        helm_errors.ResourceAlreadyExistsError
+        helm_errors.ResourceAlreadyExistsError,
+        helm_errors.InvalidResourceError
     ) as exc:
         # These are permanent errors that can only be resolved by changing the spec
         addon.set_phase(api.AddonPhase.FAILED, str(exc))
