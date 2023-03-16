@@ -66,6 +66,8 @@ class Configuration(BaseConfiguration):
     configmap_annotation_prefix: constr(min_length = 1) = None
     #: Prefix to use for annotations containing a secret checksum
     secret_annotation_prefix: constr(min_length = 1) = None
+    #: Annotation to use to trigger restarts of workloads in lifecycle hooks
+    lifecycle_hook_restart_annotation: constr(min_length = 1) = None
 
     @validator("annotation_prefix", pre = True, always = True)
     def default_annotation_prefix(cls, v, *, values, **kwargs):
@@ -94,6 +96,10 @@ class Configuration(BaseConfiguration):
     @validator("secret_annotation_prefix", pre = True, always = True)
     def default_secret_annotation_prefix(cls, v, *, values, **kwargs):
         return v or f"secret.{values['annotation_prefix']}"
+
+    @validator("lifecycle_hook_restart_annotation", pre = True, always = True)
+    def default_lifecycle_hook_restart_annotation(cls, v, *, values, **kwargs):
+        return v or f"{values['annotation_prefix']}/restarted-at"
 
 
 settings = Configuration()

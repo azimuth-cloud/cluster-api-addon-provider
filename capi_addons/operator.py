@@ -247,8 +247,15 @@ async def handle_addon_updated(addon, **kwargs):
     # This suppresses the stack trace in logs/events
     # Let unexpected errors bubble without suppressing the stack trace so they can be debugged
     except ApiError as exc:
+        # 404 and 409 are recoverable
         if exc.status_code in {404, 409}:
             raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+        # All other 4xx errors are probably permanent, as they are client errors
+        # They can likely only be resolved by changing the spec
+        elif 400 <= exc.status_code < 500:
+            addon.set_phase(api.AddonPhase.FAILED, str(exc))
+            await addon.save_status(ek_client)
+            raise kopf.PermanentError(str(exc))
         else:
             raise
     except (
