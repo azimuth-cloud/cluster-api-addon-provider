@@ -1,4 +1,5 @@
 import contextlib
+from datetime import datetime, timezone
 import hashlib
 import pathlib
 import re
@@ -9,6 +10,7 @@ import yaml
 
 from pydantic import Field, constr
 
+from easykube import ApiError
 from easykube.kubernetes.client import AsyncClient
 from kube_custom_resource import CustomResource, schema
 from pyhelm3 import (
@@ -21,6 +23,189 @@ from pyhelm3 import (
 
 from ...config import settings
 from ...template import Loader
+
+
+class LifecycleHookAction(str, schema.Enum):
+    """
+    Enumeration of possible actions to take as part of a lifecycle hook.
+    """
+    #: Indicates that a patch should be applied to matching resources
+    PATCH = "patch"
+    #: Indicates that matching resources should be deleted
+    DELETE = "delete"
+    #: Indicates that matching resources should be restarted
+    #: Equivalent to "kubectl rollout restart"
+    RESTART = "restart"
+
+
+class LifecycleHook(schema.BaseModel):
+    """
+    Model for a single lifecycle hook.
+    """
+    api_version: constr(regex = r"^([a-z][a-z0-9\.-]*/)?v[0-9][a-z0-9]*$") = Field(
+        ...,
+        description = "The API version of the resource(s) to operate on."
+    )
+    kind: constr(regex = r"^[a-zA-Z0-9]+$") = Field(
+        ...,
+        description = "The kind of the resource(s) to operate on."
+    )
+    name: typing.Optional[constr(regex = r"^[a-z][a-z0-9-]*$")] = Field(
+        None,
+        description = (
+            "The name of the resource to operate on. "
+            "Takes precedence over selector if both are given."
+        )
+    )
+    selector: schema.Dict[str, str] = Field(
+        default_factory = dict,
+        description = (
+            "A selector for the resource(s) to operate on. "
+            "If name and selector are both empty, the lifecycle hook does nothing."
+        )
+    )
+    action: LifecycleHookAction = Field(
+        ...,
+        description = "The action to take for the lifecycle hook."
+    )
+    options: schema.Dict[str, typing.Any] = Field(
+        default_factory = dict,
+        description = "Options for the action."
+    )
+
+    async def _apply_patch(self, ek_resource, addon, patch_type, patch_data):
+        if patch_type == "json":
+            patch_func = ek_resource.json_patch
+        elif patch_type == "merge":
+            patch_func = ek_resource.json_merge_patch
+        else:
+            patch_func = ek_resource.patch
+        if self.name:
+            try:
+                await patch_func(
+                    self.name,
+                    patch_data,
+                    namespace = addon.spec.target_namespace
+                )
+            except ApiError as exc:
+                if exc.status_code == 404:
+                    return
+                else:
+                    raise
+        elif self.selector:
+            async for resource in ek_resource.list(
+                labels = self.selector,
+                namespace = addon.spec.target_namespace
+            ):
+                await patch_func(
+                    resource.metadata.name,
+                    patch_data,
+                    namespace = resource.metadata.namespace
+                )
+        else:
+            return
+
+    async def _patch(self, ek_resource, addon):
+        patch_data = self.options.get("data")
+        if not patch_data:
+            return
+        await self._apply_patch(
+            ek_resource,
+            addon,
+            self.options.get("type", "strategic"),
+            patch_data
+        )
+
+    async def _delete(self, ek_resource, addon):
+        propagation_policy = self.options.get("propagationPolicy", "Background")
+        if self.name:
+            await ek_resource.delete(
+                self.name,
+                propagation_policy = propagation_policy,
+                namespace = addon.spec.target_namespace
+            )
+        elif self.selector:
+            await ek_resource.delete_all(
+                labels = self.selector,
+                propagation_policy = propagation_policy,
+                namespace = addon.spec.target_namespace
+            )
+
+    async def _restart(self, ek_resource, addon):
+        if (
+            self.api_version != "apps/v1" or
+            self.kind not in {"Deployment", "DaemonSet", "StatefulSet"}
+        ):
+            return
+        # We trigger a restart by patching the annotations of the pod template
+        await self._apply_patch(
+            ek_resource,
+            addon,
+            "strategic",
+            {
+                "spec": {
+                    "template": {
+                        "metadata": {
+                            "annotations": {
+                                settings.lifecycle_hook_restart_annotation: (
+                                    datetime.now(tz = timezone.utc)
+                                ),
+                            },
+                        },
+                    },
+                },
+            }
+        )
+
+    async def execute(
+        self,
+        # easykube client for the target cluster
+        ek_client: AsyncClient,
+        # The addon that the hook is for
+        addon: typing.ForwardRef("Addon")
+    ):
+        """
+        Execute this lifecycle hook for the given addon.
+        """
+        if not self.name and not self.selector:
+            return
+        # Get the easykube resource for the specified kind
+        # If we can't find it, that is fine
+        try:
+            ek_resource = await ek_client.api(self.api_version).resource(self.kind)
+        except ApiError as exc:
+            if exc.status_code == 404:
+                return
+            else:
+                raise
+        if self.action == LifecycleHookAction.PATCH:
+            await self._patch(ek_resource, addon)
+        elif self.action == LifecycleHookAction.DELETE:
+            await self._delete(ek_resource, addon)
+        elif self.action == LifecycleHookAction.RESTART:
+            await self._restart(ek_resource, addon)
+
+
+class LifecycleHooks(schema.BaseModel):
+    """
+    Model for defining lifecycle hooks.
+    """
+    pre_upgrade: typing.List[LifecycleHook] = Field(
+        default_factory = list,
+        description = "Hooks to be run before the addon is installed or upgraded."
+    )
+    post_upgrade: typing.List[LifecycleHook] = Field(
+        default_factory = list,
+        description = "Hooks to be run after the addon is installed or upgraded."
+    )
+    pre_delete: typing.List[LifecycleHook] = Field(
+        default_factory = list,
+        description = "Hooks to be run before the addon is deleted."
+    )
+    post_delete: typing.List[LifecycleHook] = Field(
+        default_factory = list,
+        description = "Hooks to be run after the addon is deleted."
+    )
 
 
 class AddonSpec(schema.BaseModel):
@@ -53,6 +238,10 @@ class AddonSpec(schema.BaseModel):
             "The time to wait for components to become ready. "
             "If not given, the default timeout for the operator will be used."
         )
+    )
+    lifecycle_hooks: LifecycleHooks = Field(
+        default_factory = LifecycleHooks,
+        description = "Lifecycle hooks for the addon."
     )
 
 
@@ -397,6 +586,8 @@ class Addon(CustomResource, abstract = True):
                     else AddonPhase.INSTALLING
                 )
                 await self.save_status(ek_client_management)
+                for hook in self.spec.lifecycle_hooks.pre_upgrade:
+                    await hook.execute(ek_client_target, self)
                 crds = await chart.crds()
                 for crd in crds:
                     await ek_client_target.apply_object(crd, force = True)
@@ -409,6 +600,12 @@ class Addon(CustomResource, abstract = True):
                     timeout = self.spec.release_timeout,
                     wait = True
                 )
+        if (
+            current_revision.status == ReleaseRevisionStatus.DEPLOYED and
+            self.status.phase != AddonPhase.DEPLOYED
+        ):
+            for hook in self.spec.lifecycle_hooks.post_upgrade:
+                await hook.execute(ek_client_target, self)
         # Make sure the status matches the current revision
         self.status.revision = current_revision.revision
         if current_revision.status == ReleaseRevisionStatus.DEPLOYED:
@@ -444,6 +641,8 @@ class Addon(CustomResource, abstract = True):
         """
         self.set_phase(AddonPhase.UNINSTALLING)
         await self.save_status(ek_client_management)
+        for hook in self.spec.lifecycle_hooks.pre_delete:
+            await hook.execute(ek_client_target, self)
         await helm_client.uninstall_release(
             self.spec.release_name or self.metadata.name,
             namespace = self.spec.target_namespace,
@@ -451,6 +650,8 @@ class Addon(CustomResource, abstract = True):
             wait = True
         )
         # We leave CRDs behind on purpose
+        for hook in self.spec.lifecycle_hooks.post_delete:
+            await hook.execute(ek_client_target, self)
 
 
 class EphemeralChartAddon(Addon, abstract = True):
