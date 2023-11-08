@@ -1,7 +1,7 @@
 import base64
 import typing as t
 
-from pydantic import Field, constr
+from pydantic import Field
 
 from easykube.kubernetes.client import AsyncClient
 
@@ -20,18 +20,18 @@ class ManifestSourceNameKeys(schema.BaseModel):
     Model for a manifest source that consists of a resource name and sets of keys to
     explicitly include or exclude.
     """
-    name: constr(regex = r"^[a-z0-9-]+$") = Field(
+    name: schema.constr(pattern =r"^[a-z0-9-]+$") = Field(
         ...,
         description = "The name of the resource to use."
     )
-    keys: t.List[constr(min_length = 1)] = Field(
+    keys: t.List[schema.constr(min_length = 1)] = Field(
         default_factory = list,
         description = (
             "The keys in the resource to render as manifests. "
             "If not given, all the keys are considered."
         )
     )
-    exclude_keys: t.List[constr(min_length = 1)] = Field(
+    exclude_keys: t.List[schema.constr(min_length = 1)] = Field(
         default_factory = list,
         description = "Keys to explicitly exclude from being rendered as manifests."
     )
@@ -130,7 +130,7 @@ class ManifestTemplateSource(schema.BaseModel):
     The template is provided with the Manifests object, the Cluster API Cluster
     resource and the infrastructure cluster resource as template variables.
     """
-    template: constr(min_length = 1) = Field(
+    template: schema.constr(min_length = 1) = Field(
         ...,
         description = "The template to use to render the manifests."
     )
@@ -156,10 +156,13 @@ class ManifestTemplateSource(schema.BaseModel):
         )
 
 
-ManifestSource = schema.StructuralUnion[
-    ManifestConfigMapSource,
-    ManifestSecretSource,
-    ManifestTemplateSource,
+ManifestSource = t.Annotated[
+    t.Union[
+        ManifestConfigMapSource,
+        ManifestSecretSource,
+        ManifestTemplateSource,
+    ],
+    schema.StructuralUnion
 ]
 ManifestSource.__doc__ = "Union type for the possible manifest sources."
 

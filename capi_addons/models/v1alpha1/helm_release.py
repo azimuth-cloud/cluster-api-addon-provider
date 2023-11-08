@@ -3,7 +3,7 @@ import contextlib
 import pathlib
 import typing as t
 
-from pydantic import Field, AnyHttpUrl, constr
+from pydantic import Field
 
 from easykube.kubernetes.client import AsyncClient
 
@@ -20,23 +20,22 @@ from .base import Addon, AddonSpec
 HelmReleaseType = t.TypeVar("HelmReleaseType", bound = "HelmRelease")
 
 
-#: Type for a SemVer version
-SemVerVersion = constr(regex = r"^v?\d+\.\d+\.\d+(-[a-zA-Z0-9\.\-]+)?(\+[a-zA-Z0-9\.\-]+)?$")
+SEMVER_PATTERN = r"^v?\d+\.\d+\.\d+(-[a-zA-Z0-9\.\-]+)?(\+[a-zA-Z0-9\.\-]+)?$"
 
 
 class HelmChart(schema.BaseModel):
     """
     Specification for the chart to use.
     """
-    repo: AnyHttpUrl = Field(
+    repo: schema.AnyHttpUrl = Field(
         ...,
         description = "The Helm repository that the chart is in."
     )
-    name: constr(regex = r"^[a-z0-9-]+$") = Field(
+    name: schema.constr(pattern =r"^[a-z0-9-]+$") = Field(
         ...,
         description = "The name of the chart."
     )
-    version: SemVerVersion = Field(
+    version: schema.constr(pattern = SEMVER_PATTERN) = Field(
         ...,
         description = "The version of the chart to use."
     )
@@ -46,11 +45,11 @@ class HelmValuesSourceNameKey(schema.BaseModel):
     """
     Model for a Helm values source that consists of a data resource name and key.
     """
-    name: constr(regex = r"^[a-z0-9-]+$") = Field(
+    name: schema.constr(pattern =r"^[a-z0-9-]+$") = Field(
         ...,
         description = "The name of the resource to use."
     )
-    key: constr(min_length = 1) = Field(
+    key: schema.constr(min_length = 1) = Field(
         "values.yaml",
         description = (
             "The key in the resource data to get the values from. "
@@ -139,7 +138,7 @@ class HelmValuesTemplateSource(schema.BaseModel):
     The template is provided with the HelmRelease object, the Cluster API Cluster
     resource and the infrastructure cluster resource as template variables.
     """
-    template: constr(min_length = 1) = Field(
+    template: schema.constr(min_length = 1) = Field(
         ...,
         description = "The template to use to render the values."
     )
@@ -162,10 +161,13 @@ class HelmValuesTemplateSource(schema.BaseModel):
         )
 
 
-HelmValuesSource = schema.StructuralUnion[
-    HelmValuesConfigMapSource,
-    HelmValuesSecretSource,
-    HelmValuesTemplateSource,
+HelmValuesSource = t.Annotated[
+    t.Union[
+        HelmValuesConfigMapSource,
+        HelmValuesSecretSource,
+        HelmValuesTemplateSource,
+    ],
+    schema.StructuralUnion
 ]
 HelmValuesSource.__doc__ = "Union type for the possible values sources."
 
