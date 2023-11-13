@@ -8,7 +8,7 @@ import typing
 
 import yaml
 
-from pydantic import Field, constr
+from pydantic import Field
 
 from easykube import ApiError
 from easykube.kubernetes.client import AsyncClient
@@ -42,15 +42,15 @@ class LifecycleHook(schema.BaseModel):
     """
     Model for a single lifecycle hook.
     """
-    api_version: constr(regex = r"^([a-z][a-z0-9\.-]*/)?v[0-9][a-z0-9]*$") = Field(
+    api_version: schema.constr(pattern =r"^([a-z][a-z0-9\.-]*/)?v[0-9][a-z0-9]*$") = Field(
         ...,
         description = "The API version of the resource(s) to operate on."
     )
-    kind: constr(regex = r"^[a-zA-Z0-9]+$") = Field(
+    kind: schema.constr(pattern =r"^[a-zA-Z0-9]+$") = Field(
         ...,
         description = "The kind of the resource(s) to operate on."
     )
-    name: typing.Optional[constr(regex = r"^[a-z][a-z0-9-]*$")] = Field(
+    name: schema.Optional[schema.constr(pattern =r"^[a-z][a-z0-9-]*$")] = Field(
         None,
         description = (
             "The name of the resource to operate on. "
@@ -68,7 +68,7 @@ class LifecycleHook(schema.BaseModel):
         ...,
         description = "The action to take for the lifecycle hook."
     )
-    options: schema.Dict[str, typing.Any] = Field(
+    options: schema.Dict[str, schema.Any] = Field(
         default_factory = dict,
         description = "Options for the action."
     )
@@ -212,7 +212,7 @@ class AddonSpec(schema.BaseModel):
     """
     Base class for the spec of addon resources.
     """
-    cluster_name: constr(min_length = 1) = Field(
+    cluster_name: schema.constr(min_length = 1) = Field(
         ...,
         description = "The name of the Cluster API cluster that the addon is for."
     )
@@ -224,15 +224,15 @@ class AddonSpec(schema.BaseModel):
             "waiting for the cluster to become ready."
         )
     )
-    target_namespace: constr(regex = r"^[a-z0-9-]+$") = Field(
+    target_namespace: schema.constr(pattern =r"^[a-z0-9-]+$") = Field(
         ...,
         description = "The namespace on the target cluster to make the release in."
     )
-    release_name: typing.Optional[constr(regex = r"^[a-z0-9-]+$")] = Field(
+    release_name: schema.Optional[schema.constr(pattern =r"^[a-z0-9-]+$")] = Field(
         None,
         description = "The name of the release. Defaults to the name of the resource."
     )
-    release_timeout: typing.Optional[schema.IntOrString] = Field(
+    release_timeout: schema.Optional[schema.IntOrString] = Field(
         None,
         description = (
             "The time to wait for components to become ready. "
@@ -271,15 +271,15 @@ class AddonResource(schema.BaseModel):
     """
     Reference to a resource on the target cluster.
     """
-    api_version: constr(min_length = 1) = Field(
+    api_version: schema.constr(min_length = 1) = Field(
         ...,
         description = "The API version of the resource."
     )
-    kind: constr(min_length = 1) = Field(
+    kind: schema.constr(min_length = 1) = Field(
         ...,
         description = "The kind of the resource."
     )
-    name: constr(min_length = 1) = Field(
+    name: schema.constr(min_length = 1) = Field(
         ...,
         description = "The name of the resource."
     )
@@ -289,7 +289,7 @@ class AddonResource(schema.BaseModel):
     )
 
 
-class AddonStatus(schema.BaseModel):
+class AddonStatus(schema.BaseModel, extra = "allow"):
     """
     The status of an addon.
     """
@@ -305,7 +305,7 @@ class AddonStatus(schema.BaseModel):
         default_factory = list,
         description = "The resources that were produced for the current revision."
     )
-    notes: typing.Optional[str] = Field(
+    notes: schema.Optional[str] = Field(
         None,
         description = "The notes from the release."
     )
@@ -339,7 +339,7 @@ class Addon(CustomResource, abstract = True):
             {
                 # Include the resource version for optimistic concurrency
                 "metadata": { "resourceVersion": self.metadata.resource_version },
-                "status": self.status.dict(exclude_defaults = True),
+                "status": self.status.model_dump(exclude_defaults = True),
             },
             namespace = self.metadata.namespace
         )
