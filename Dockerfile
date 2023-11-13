@@ -66,4 +66,4 @@ COPY --from=python-builder /venv /venv
 
 USER $APP_UID
 ENTRYPOINT ["tini", "-g", "--"]
-CMD ["kopf", "run", "--module", "capi_addons.operator", "--all-namespaces"]
+CMD ["/venv/bin/kopf", "run", "--module", "capi_addons.operator", "--all-namespaces"]
