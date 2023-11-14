@@ -10,6 +10,12 @@ on:
   # Also allow publication to be done via a workflow call
   # In this case, the chart version is returned as an output
   workflow_call:
+    inputs:
+      ref:
+        type: string
+        description: The ref to build.
+        required: true
+        default: ${{ github.ref }}
     outputs:
       chart-version:
         description: The chart version that was published
@@ -22,6 +28,8 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
@@ -62,6 +70,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v3
         with:
+          ref: ${{ inputs.ref }}
           # This is important for the semver action to work correctly
           # when determining the number of commits since the last tag
           fetch-depth: 0
