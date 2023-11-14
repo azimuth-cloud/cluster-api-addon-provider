@@ -1,0 +1,24 @@
+---
+
+version: 2
+
+updates:
+  # Automatically propose PRs for out-of-date GitHub actions
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      # Check for new versions weekly
+      interval: weekly
+    labels:
+      - automation
+      - gha-update
+
+  # Automatically propose PRs for Python dependencies
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      # Check for new versions daily
+      interval: daily
+    labels:
+      - automation
+      - pip-update
