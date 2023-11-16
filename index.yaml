@@ -2,8 +2,18 @@ apiVersion: v1
 entries:
   cluster-api-addon-provider:
   - apiVersion: v2
+    appVersion: "5268911"
+    created: "2023-11-16T08:45:03.457257375Z"
+    description: Helm chart for deploying the Cluster API addon provider.
+    digest: 7ab5c018e65918a2315a9dfd328e67c860b2cd4627966e173423ea482bbbe648
+    name: cluster-api-addon-provider
+    type: application
+    urls:
+    - cluster-api-addon-provider-0.1.1-dev.0.main.21.tgz
+    version: 0.1.1-dev.0.main.21
+  - apiVersion: v2
     appVersion: "4526814"
-    created: "2023-11-15T22:59:45.491718048Z"
+    created: "2023-11-16T08:45:03.457028254Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 83a63b9e9aebc0ee33fc0cd06cae21bf98d3c5921dbb28eea6ab8056c8b10136
     name: cluster-api-addon-provider
@@ -13,7 +23,7 @@ entries:
     version: 0.1.1-dev.0.main.19
   - apiVersion: v2
     appVersion: a874d41
-    created: "2023-11-15T22:59:45.491489499Z"
+    created: "2023-11-16T08:45:03.456803552Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 17d85accfd13dbb60167374c9a84378c23775110f9e2be2dc0abf9e2bd2c433a
     name: cluster-api-addon-provider
@@ -23,7 +33,7 @@ entries:
     version: 0.1.1-dev.0.main.18
   - apiVersion: v2
     appVersion: 38b4429
-    created: "2023-11-15T22:59:45.49124508Z"
+    created: "2023-11-16T08:45:03.456577478Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 62289d566934d7dc01a386b2a3ad5026ebb095db68f7b719aeb063d75535afe4
     name: cluster-api-addon-provider
@@ -33,7 +43,7 @@ entries:
     version: 0.1.1-dev.0.main.16
   - apiVersion: v2
     appVersion: "5575741"
-    created: "2023-11-15T22:59:45.490902037Z"
+    created: "2023-11-16T08:45:03.456341434Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: d7a77df02948a928d928c5cccb70830e0e70bde5bf9dbf5de1330126b011dbd7
     name: cluster-api-addon-provider
@@ -43,7 +53,7 @@ entries:
     version: 0.1.1-dev.0.main.14
   - apiVersion: v2
     appVersion: 3a6da06
-    created: "2023-11-15T22:59:45.490608506Z"
+    created: "2023-11-16T08:45:03.456109177Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 6e6f0f076412b74102f367ef99b4861ab1ecca92c7aa69e96b56f9f75239dee8
     name: cluster-api-addon-provider
@@ -53,7 +63,7 @@ entries:
     version: 0.1.1-dev.0.main.13
   - apiVersion: v2
     appVersion: c701ea4
-    created: "2023-11-15T22:59:45.490324853Z"
+    created: "2023-11-16T08:45:03.455817028Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 6390449c8e533ad14665307d7c581dae384341a4fa7a5c9a395dffce6ac63e8b
     name: cluster-api-addon-provider
@@ -63,7 +73,7 @@ entries:
     version: 0.1.1-dev.0.main.10
   - apiVersion: v2
     appVersion: 0147eee
-    created: "2023-11-15T22:59:45.491958169Z"
+    created: "2023-11-16T08:45:03.457482989Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: f29d4a7ae937a4604cf35bac889255d288e09a9eb5a7e80a9d3c06a421d61e3a
     name: cluster-api-addon-provider
@@ -73,7 +83,7 @@ entries:
     version: 0.1.1-dev.0.main.6
   - apiVersion: v2
     appVersion: fe85c4f
-    created: "2023-11-15T22:59:45.488540605Z"
+    created: "2023-11-16T08:45:03.455110791Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: f072b549623dad147418cc8622981c3f85bec6446b2659e146631152508b37c8
     name: cluster-api-addon-provider
@@ -83,7 +93,7 @@ entries:
     version: 0.1.1-dev.0.feature-reduce-cves.10
   - apiVersion: v2
     appVersion: 74fe361
-    created: "2023-11-15T22:59:45.489597408Z"
+    created: "2023-11-16T08:45:03.455582578Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: c618eb33b6c7ef1eddd0dd0dfa85af2b40809b00b2248156736a43144a6de05d
     name: cluster-api-addon-provider
@@ -93,7 +103,7 @@ entries:
     version: 0.1.1-dev.0.feature-reduce-cves.9
   - apiVersion: v2
     appVersion: 8acec8f
-    created: "2023-11-15T22:59:45.488940245Z"
+    created: "2023-11-16T08:45:03.455348438Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 4ba42a510a124ea8a0b696ae4bbaba07de7da657963071ef3252bb02edf59671
     name: cluster-api-addon-provider
@@ -103,7 +113,7 @@ entries:
     version: 0.1.1-dev.0.feature-reduce-cves.8
   - apiVersion: v2
     appVersion: 8e54365
-    created: "2023-11-15T22:59:45.488317145Z"
+    created: "2023-11-16T08:45:03.454862995Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 46e8eeb9e30b2788808bf558ce210624a2085b94587b60a815f26fa7ff39633f
     name: cluster-api-addon-provider
@@ -113,7 +123,7 @@ entries:
     version: 0.1.1-dev.0.feature-migrate-to-pydanticv2.6
   - apiVersion: v2
     appVersion: 61c730d
-    created: "2023-11-15T22:59:45.488083287Z"
+    created: "2023-11-16T08:45:03.45459409Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: be4df79fb603e5f0906119cb6b15106d2eccff10db2e569714394198bc31c28b
     name: cluster-api-addon-provider
@@ -123,7 +133,7 @@ entries:
     version: 0.1.1-dev.0.feature-migrate-to-pydanticv2.4
   - apiVersion: v2
     appVersion: 82da44a
-    created: "2023-11-15T22:59:45.487858495Z"
+    created: "2023-11-16T08:45:03.454112229Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 5e77f572e109daa6fc17fd28ea8f191fe0f3cbd92e5b92a390f9b9e48c702331
     name: cluster-api-addon-provider
@@ -133,7 +143,7 @@ entries:
     version: 0.1.1-dev.0.feature-migrate-to-pydanticv2.3
   - apiVersion: v2
     appVersion: 54765a7
-    created: "2023-11-15T22:59:45.487631148Z"
+    created: "2023-11-16T08:45:03.453621337Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: d3544e0ad038933565892109e7b718b4660f4e684469951c484654267521d43e
     name: cluster-api-addon-provider
@@ -143,7 +153,7 @@ entries:
     version: 0.1.1-dev.0.feature-migrate-to-pydanticv2.2
   - apiVersion: v2
     appVersion: cdbfd96
-    created: "2023-11-15T22:59:45.487392581Z"
+    created: "2023-11-16T08:45:03.452944064Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 77bc0e6a8a85399692cf0875b4167ba508ae1b99c6d65e78119f4b22929e8658
     name: cluster-api-addon-provider
@@ -153,7 +163,7 @@ entries:
     version: 0.1.1-dev.0.feature-migrate-to-pydanticv2.1
   - apiVersion: v2
     appVersion: 0fce9dd
-    created: "2023-11-15T22:59:45.48715248Z"
+    created: "2023-11-16T08:45:03.452706758Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: c0030b1a0300e552deb7f1197a0b70bbf59f3390072a44ffebaad8166a54bdb4
     name: cluster-api-addon-provider
@@ -163,7 +173,7 @@ entries:
     version: 0.1.1-dev.0.feature-dependabot.12
   - apiVersion: v2
     appVersion: "5575741"
-    created: "2023-11-15T22:59:45.486860812Z"
+    created: "2023-11-16T08:45:03.452475514Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 97a853e5ad9e89ca9a609ce736854ea6c4f9446a21275fb9f8982a9f6d89aa42
     name: cluster-api-addon-provider
@@ -173,7 +183,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-pip-pydantic-core-2-14-3.15
   - apiVersion: v2
     appVersion: "5575741"
-    created: "2023-11-15T22:59:45.486447316Z"
+    created: "2023-11-16T08:45:03.452224352Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: c1428514cbcdfd2c3512db36db2f84fbb4a850d1299d71dee9b553341e77cc7c
     name: cluster-api-addon-provider
@@ -183,7 +193,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-pip-pydantic-core-2-14-2.15
   - apiVersion: v2
     appVersion: 38b4429
-    created: "2023-11-15T22:59:45.486128228Z"
+    created: "2023-11-16T08:45:03.451990162Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 20dd0dfb500edebf1f24a0586fe95b0961d8d9f3f81ed0a2a916ed0de4412392
     name: cluster-api-addon-provider
@@ -193,7 +203,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-pip-pydantic-2-5-0.17
   - apiVersion: v2
     appVersion: "5575741"
-    created: "2023-11-15T22:59:45.48587386Z"
+    created: "2023-11-16T08:45:03.451748888Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 2d64062bc3824326ace56d60037f265c35e5c10fb6cefb5534e7bdf7b073ed6f
     name: cluster-api-addon-provider
@@ -203,7 +213,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-pip-pydantic-2-5-0.15
   - apiVersion: v2
     appVersion: "5575741"
-    created: "2023-11-15T22:59:45.485645692Z"
+    created: "2023-11-16T08:45:03.451512163Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 37d3eb87efe80e9127d62cd63b98364cdb8c4d9cdf1815ceba3cefc4f0568fe0
     name: cluster-api-addon-provider
@@ -213,7 +223,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-pip-httpcore-1-0-2.15
   - apiVersion: v2
     appVersion: "4526814"
-    created: "2023-11-15T22:59:45.485419477Z"
+    created: "2023-11-16T08:45:03.451177585Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 323829729bdf82023bb1b3fbbda215801ebd87fa3960745737e2a4c2afb48dbd
     name: cluster-api-addon-provider
@@ -223,7 +233,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-github-actions-github-actions-e53591e42e.20
   - apiVersion: v2
     appVersion: "5575741"
-    created: "2023-11-15T22:59:45.485192782Z"
+    created: "2023-11-16T08:45:03.450767254Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: d597fa65259e71f12d900e217d477d83ac2743592d850983fbba964f7be0abfa
     name: cluster-api-addon-provider
@@ -233,7 +243,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-github-actions-docker-metadata-action-5.15
   - apiVersion: v2
     appVersion: "5575741"
-    created: "2023-11-15T22:59:45.484960095Z"
+    created: "2023-11-16T08:45:03.450333979Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 0927082885d0adff5b5f7ec611712fbf70b85a6beb8fa7057232e001cc9d3e35
     name: cluster-api-addon-provider
@@ -243,7 +253,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-github-actions-docker-login-action-3.15
   - apiVersion: v2
     appVersion: "5575741"
-    created: "2023-11-15T22:59:45.484731075Z"
+    created: "2023-11-16T08:45:03.449995774Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 50bb294e64ba84521b039851a9a18bcf48b7b54da7d919781f499cbd2a7e626f
     name: cluster-api-addon-provider
@@ -253,7 +263,7 @@ entries:
     version: 0.1.1-dev.0.dependabot-github-actions-actions-checkout-4.15
   - apiVersion: v2
     appVersion: 07153a3
-    created: "2023-11-15T22:59:45.484500021Z"
+    created: "2023-11-16T08:45:03.449763167Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 9ab79b8bfe677a57ac3ceefde002d91c9cb8f72c8b748adc65035063f740a4a3
     name: cluster-api-addon-provider
@@ -263,7 +273,7 @@ entries:
     version: 0.1.0
   - apiVersion: v2
     appVersion: 07153a3
-    created: "2023-11-15T22:59:45.483111205Z"
+    created: "2023-11-16T08:45:03.448368165Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 1737bbe2169a88bc5c5c0fc95c8ed7086bf83c1ce632d71ef7817d0e0fe761ca
     name: cluster-api-addon-provider
@@ -273,7 +283,7 @@ entries:
     version: 0.1.0-dev.0.main.26
   - apiVersion: v2
     appVersion: ef82cf5
-    created: "2023-11-15T22:59:45.482822784Z"
+    created: "2023-11-16T08:45:03.4481259Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: e92ee4d68eb8c12c7c31dacb54c92d094000df5039f2460ce83fb11e417b3a72
     name: cluster-api-addon-provider
@@ -283,7 +293,7 @@ entries:
     version: 0.1.0-dev.0.main.23
   - apiVersion: v2
     appVersion: 70b406c
-    created: "2023-11-15T22:59:45.482332934Z"
+    created: "2023-11-16T08:45:03.44784942Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 8e21504dfa099802c340f788a5f13ba99b9e3457fdac9d423da08398c4b5b5ee
     name: cluster-api-addon-provider
@@ -293,7 +303,7 @@ entries:
     version: 0.1.0-dev.0.main.22
   - apiVersion: v2
     appVersion: f1b6c2e
-    created: "2023-11-15T22:59:45.481844818Z"
+    created: "2023-11-16T08:45:03.447580465Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 265a15cfdb225b45b4ce4e8a6c0d59d116c81604b942c3ae0dccb363ee8303b0
     name: cluster-api-addon-provider
@@ -303,7 +313,7 @@ entries:
     version: 0.1.0-dev.0.main.21
   - apiVersion: v2
     appVersion: 02b3627
-    created: "2023-11-15T22:59:45.481362533Z"
+    created: "2023-11-16T08:45:03.447338761Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: db1446025008bf43f1e34074308d2854277f60874e4cb9b436ed31e749abfc5b
     name: cluster-api-addon-provider
@@ -313,7 +323,7 @@ entries:
     version: 0.1.0-dev.0.main.20
   - apiVersion: v2
     appVersion: b4b335a
-    created: "2023-11-15T22:59:45.480751887Z"
+    created: "2023-11-16T08:45:03.447041753Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: a62c0fddc723ddf9115eb9e20eef73be961799abc5935cdbf32eac90fe0a2884
     name: cluster-api-addon-provider
@@ -323,7 +333,7 @@ entries:
     version: 0.1.0-dev.0.main.19
   - apiVersion: v2
     appVersion: 658386f
-    created: "2023-11-15T22:59:45.480527686Z"
+    created: "2023-11-16T08:45:03.446429751Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 5dcc473ebe353eb5406d316bee6deedb16a0e30b75b0d81f730ca6132c9639b8
     name: cluster-api-addon-provider
@@ -333,7 +343,7 @@ entries:
     version: 0.1.0-dev.0.main.18
   - apiVersion: v2
     appVersion: f83d8b3
-    created: "2023-11-15T22:59:45.480301912Z"
+    created: "2023-11-16T08:45:03.445847546Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 300e9a2bf808f66dabf7756bcb989c2decd21399fe85a27eb135abc196394c19
     name: cluster-api-addon-provider
@@ -343,7 +353,7 @@ entries:
     version: 0.1.0-dev.0.main.17
   - apiVersion: v2
     appVersion: 185cc8d
-    created: "2023-11-15T22:59:45.480068394Z"
+    created: "2023-11-16T08:45:03.445510603Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 439a76daae55316e23a5e9e65ddc90f62075810364400754ed8c4af390bf112f
     name: cluster-api-addon-provider
@@ -353,7 +363,7 @@ entries:
     version: 0.1.0-dev.0.main.16
   - apiVersion: v2
     appVersion: 851507b
-    created: "2023-11-15T22:59:45.479839504Z"
+    created: "2023-11-16T08:45:03.445266334Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: bab7df6b96f65e2334bb0873e3c33b7a07c812609d4978427d9b74f354e6100a
     name: cluster-api-addon-provider
@@ -363,7 +373,7 @@ entries:
     version: 0.1.0-dev.0.main.14
   - apiVersion: v2
     appVersion: 09f0963
-    created: "2023-11-15T22:59:45.479596548Z"
+    created: "2023-11-16T08:45:03.44502451Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 7278af318814bbaa35a1a210febe9cbda65d7560c55721d6be38ba237563689d
     name: cluster-api-addon-provider
@@ -373,7 +383,7 @@ entries:
     version: 0.1.0-dev.0.main.13
   - apiVersion: v2
     appVersion: fb98572
-    created: "2023-11-15T22:59:45.479365285Z"
+    created: "2023-11-16T08:45:03.444755855Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 0338afa96df51f85459a58c2730ffe65678ad66d81f6d9e1cf92c04acf031774
     name: cluster-api-addon-provider
@@ -383,7 +393,7 @@ entries:
     version: 0.1.0-dev.0.main.12
   - apiVersion: v2
     appVersion: 9d39bfd
-    created: "2023-11-15T22:59:45.479113602Z"
+    created: "2023-11-16T08:45:03.444510213Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: e809addecd52113f473273c42a3acf5dd42ce3fd4ade97b1f33c41dd6de29cd5
     name: cluster-api-addon-provider
@@ -393,7 +403,7 @@ entries:
     version: 0.1.0-dev.0.main.11
   - apiVersion: v2
     appVersion: 7b0bf2c
-    created: "2023-11-15T22:59:45.478804572Z"
+    created: "2023-11-16T08:45:03.444256116Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: aefc937fc4246f83a726ef867609c8b07c7945c9ea69413ffa40092499f5d518
     name: cluster-api-addon-provider
@@ -403,7 +413,7 @@ entries:
     version: 0.1.0-dev.0.main.10
   - apiVersion: v2
     appVersion: 20cee84
-    created: "2023-11-15T22:59:45.484274609Z"
+    created: "2023-11-16T08:45:03.449534818Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: f67a1be94c385470c139d15f86d53ed9603a5462a57d811e4d04836511018bce
     name: cluster-api-addon-provider
@@ -413,7 +423,7 @@ entries:
     version: 0.1.0-dev.0.main.9
   - apiVersion: v2
     appVersion: e7e7dcf
-    created: "2023-11-15T22:59:45.484048584Z"
+    created: "2023-11-16T08:45:03.44928616Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 2c9be0711af7bb90fc6b34131a8a36ea043a7b69c712e60f880acd12a5d3fc86
     name: cluster-api-addon-provider
@@ -423,7 +433,7 @@ entries:
     version: 0.1.0-dev.0.main.8
   - apiVersion: v2
     appVersion: 1d7ca17
-    created: "2023-11-15T22:59:45.483819074Z"
+    created: "2023-11-16T08:45:03.449063572Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: b37c0ca4469ad61135d2862c41e8eba1723b28e3c95b24ab5084cebbbb4f3eda
     name: cluster-api-addon-provider
@@ -433,7 +443,7 @@ entries:
     version: 0.1.0-dev.0.main.7
   - apiVersion: v2
     appVersion: 50a36a3
-    created: "2023-11-15T22:59:45.483583321Z"
+    created: "2023-11-16T08:45:03.448838649Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: d799eeb34e41078425f871c6ad97d52839b9b29ca737acc73c3204c82c2c2c1c
     name: cluster-api-addon-provider
@@ -443,7 +453,7 @@ entries:
     version: 0.1.0-dev.0.main.6
   - apiVersion: v2
     appVersion: 100820f
-    created: "2023-11-15T22:59:45.483352087Z"
+    created: "2023-11-16T08:45:03.448596604Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: d626314252be20ad1bbe6334872a602cb6be3737bf3ee522e8d9847553411755
     name: cluster-api-addon-provider
@@ -453,7 +463,7 @@ entries:
     version: 0.1.0-dev.0.main.5
   - apiVersion: v2
     appVersion: "8233421"
-    created: "2023-11-15T22:59:45.478573488Z"
+    created: "2023-11-16T08:45:03.443819385Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 58779d9077618d071e12603e13440783b88395019b5a0a0dcc0bc59d293da149
     name: cluster-api-addon-provider
@@ -463,7 +473,7 @@ entries:
     version: 0.1.0-dev.0.feature-lifecycle-hooks.25
   - apiVersion: v2
     appVersion: fbd5780
-    created: "2023-11-15T22:59:45.478298623Z"
+    created: "2023-11-16T08:45:03.44355601Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: b0259c9e9b597a8582237c0abed46555840df4e47964c50fb9ecd306992c6d12
     name: cluster-api-addon-provider
@@ -473,7 +483,7 @@ entries:
     version: 0.1.0-dev.0.feature-lifecycle-hooks.24
   - apiVersion: v2
     appVersion: 98d2122
-    created: "2023-11-15T22:59:45.478063171Z"
+    created: "2023-11-16T08:45:03.443291092Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: b892b87d7cab583d3cde91d605dc4fda8c5fccbe2e696bd40a5860207475a382
     name: cluster-api-addon-provider
@@ -483,7 +493,7 @@ entries:
     version: 0.1.0-dev.0.feature-argo-support.33
   - apiVersion: v2
     appVersion: 579ba07
-    created: "2023-11-15T22:59:45.477785399Z"
+    created: "2023-11-16T08:45:03.44301865Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 08b65fefd4513dbfd1d6275c2ba80e4c7880d0503a4a61ed29bfd57cf754ca58
     name: cluster-api-addon-provider
@@ -493,7 +503,7 @@ entries:
     version: 0.1.0-dev.0.feature-argo-support.32
   - apiVersion: v2
     appVersion: "0029315"
-    created: "2023-11-15T22:59:45.477517827Z"
+    created: "2023-11-16T08:45:03.442776465Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 2085e99227c2c75ea6d8697dc38f6238db8a736f017918d1ad0dc3848050ea50
     name: cluster-api-addon-provider
@@ -503,7 +513,7 @@ entries:
     version: 0.1.0-dev.0.feature-argo-support.31
   - apiVersion: v2
     appVersion: 1d5df12
-    created: "2023-11-15T22:59:45.477250265Z"
+    created: "2023-11-16T08:45:03.442540702Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 46a41c8d1be79551c0b92e0095d10a9ba70287a720bec1c45fad5b3aca95eddc
     name: cluster-api-addon-provider
@@ -513,7 +523,7 @@ entries:
     version: 0.1.0-dev.0.feature-argo-support.30
   - apiVersion: v2
     appVersion: 59087bb
-    created: "2023-11-15T22:59:45.477019282Z"
+    created: "2023-11-16T08:45:03.442280403Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 9652eab3a5d85e12192a76bf787bdd8977791337b27a9c4ca31f83217cf6235b
     name: cluster-api-addon-provider
@@ -523,7 +533,7 @@ entries:
     version: 0.1.0-dev.0.feature-argo-support.29
   - apiVersion: v2
     appVersion: 0ea0936
-    created: "2023-11-15T22:59:45.476775414Z"
+    created: "2023-11-16T08:45:03.442004073Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 150be11a0eaca0021f6708fe17d39faaedd13cb0a67e83b1d7074afeef452d12
     name: cluster-api-addon-provider
@@ -533,7 +543,7 @@ entries:
     version: 0.1.0-dev.0.feature-argo-support.28
   - apiVersion: v2
     appVersion: f84781f
-    created: "2023-11-15T22:59:45.476463067Z"
+    created: "2023-11-16T08:45:03.441728004Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: ee5510d94505d515377c41faa78eafd91006e70af2a6aa7ac78ee24831b8e73b
     name: cluster-api-addon-provider
@@ -543,7 +553,7 @@ entries:
     version: 0.1.0-dev.0.feature-argo-support.26
   - apiVersion: v2
     appVersion: c5754b3
-    created: "2023-11-15T22:59:45.476179205Z"
+    created: "2023-11-16T08:45:03.441464219Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: 18aa2287224e40c3b56ce8ef3e550ec0a50a3b9a9a77b371991b6bf9ef06fa8f
     name: cluster-api-addon-provider
@@ -553,7 +563,7 @@ entries:
     version: 0.1.0-dev.0.feature-argo-support.25
   - apiVersion: v2
     appVersion: 8f7ca15
-    created: "2023-11-15T22:59:45.475885904Z"
+    created: "2023-11-16T08:45:03.44118814Z"
     description: Helm chart for deploying the Cluster API addon provider.
     digest: fcbe6673921b904b011eb268ab5f4a424aa19ca456ded6649d074ec5d547e0a9
     name: cluster-api-addon-provider
@@ -561,4 +571,4 @@ entries:
     urls:
     - cluster-api-addon-provider-0.1.0-dev.0.feature-argo-support.23.tgz
     version: 0.1.0-dev.0.feature-argo-support.23
-generated: "2023-11-15T22:59:45.475450607Z"
+generated: "2023-11-16T08:45:03.440787187Z"
