@@ -30,8 +30,17 @@ jobs:
       - name: PR must be from a branch in the stackhpc/cluster-api-addon-provider repo
         run: exit ${{ github.event.pull_request.head.repo.full_name == 'stackhpc/cluster-api-addon-provider' && '0' || '1' }}
 
-  publish_artifacts:
+  # Use a job that does nothing but is protected by an environment as a guard
+  # This allows us to control when the jobs that consume infrastructure run
+  wait_for_approval:
     needs: [fail_on_remote]
+    runs-on: ubuntu-latest
+    environment: ci-approval
+    steps:
+      - run: exit 0
+
+  publish_artifacts:
+    needs: [wait_for_approval]
     uses: ./.github/workflows/build-push-artifacts.yaml
     with:
       ref: ${{ github.event.pull_request.head.sha }}
