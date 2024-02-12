@@ -222,25 +222,19 @@ class Manifests(
         description = "The specification for the manifests."
     )
 
-    def uses_configmap(self, name: str):
-        for source in self.spec.manifest_sources:
-            if (
-                isinstance(source, ManifestConfigMapSource) and
-                source.config_map.name == name
-            ):
-                return True
-        else:
-            return False
+    def list_configmaps(self):
+        return [
+            source.config_map.name
+            for source in self.spec.manifest_sources
+            if isinstance(source, ManifestConfigMapSource)
+        ]
 
-    def uses_secret(self, name: str):
-        for source in self.spec.manifest_sources:
-            if (
-                isinstance(source, ManifestSecretSource) and
-                source.secret.name == name
-            ):
-                return True
-        else:
-            return False
+    def list_secrets(self):
+        return [
+            source.secret.name
+            for source in self.spec.manifest_sources
+            if isinstance(source, ManifestSecretSource)
+        ]
 
     async def get_resources(
         self,
@@ -249,7 +243,7 @@ class Manifests(
         cluster: t.Dict[str, t.Any],
         infra_cluster: t.Dict[str, t.Any],
         cloud_identity: t.Optional[t.Dict[str, t.Any]]
-    ) -> t.Iterable[t.Dict[str, t.Any]]:
+    ) -> t.AsyncIterable[t.Dict[str, t.Any]]:
         """
         Returns the resources to use to build the ephemeral chart.
         """

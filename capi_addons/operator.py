@@ -9,7 +9,7 @@ import tempfile
 
 import kopf
 
-from easykube import Configuration, ApiError, resources as k8s
+from easykube import Configuration, ApiError, resources as k8s, PRESENT
 
 from kube_custom_resource import CustomResourceRegistry
 
@@ -139,21 +139,17 @@ async def until_deleted(addon):
     """
     ekapi = ek_client.api(addon.api_version)
     resource = await ekapi.resource(addon._meta.plural_name)
-    while True:
-        try:
-            initial, events = await resource.watch_one(
+    try:
+        while True:
+            await asyncio.sleep(5)
+            addon_obj = await resource.fetch(
                 addon.metadata.name,
                 namespace = addon.metadata.namespace
             )
-            if initial and initial["metadata"].get("deletionTimestamp"):
+            if addon_obj.metadata.get("deletionTimestamp"):
                 return
-            async for event in events:
-                if event["object"]["metadata"].get("deletionTimestamp"):
-                    return
-        except asyncio.CancelledError:
-            return
-        except Exception:
-            continue
+    except asyncio.CancelledError:
+        return
 
 
 @addon_handler(kopf.on.create)
@@ -183,9 +179,45 @@ async def handle_addon_updated(addon, **kwargs):
             addon.spec.cluster_name,
             namespace = addon.metadata.namespace
         )
-        # Make sure that the cluster owns the addon
-        await addon.init_metadata(ek_client, cluster)
-        # Ensure that the cluster is in a suitable state
+        # Get the infra cluster for the CAPI cluster
+        infra_cluster = await fetch_ref(
+            cluster.spec["infrastructureRef"],
+            cluster.metadata.namespace
+        )
+        # Get the cloud identity for the infra cluster, if it exists
+        # It is made available to templates in case they need to configure access to the host cloud
+        id_ref = infra_cluster.spec.get("identityRef")
+        if id_ref:
+            cloud_identity = await fetch_ref(id_ref, cluster.metadata.namespace)
+        else:
+            cloud_identity = None
+        # Make sure that the cluster owns the addon and the addon has the required labels
+        await addon.init_metadata(ek_client, cluster, cloud_identity)
+        # Make sure any referenced configmaps or secrets will be watched
+        configmaps = await ek_client.api("v1").resource("configmaps")
+        for configmap in addon.list_configmaps():
+            await configmaps.patch(
+                configmap,
+                {"metadata": {"labels": {settings.watch_label: ""}}},
+                namespace = addon.metadata.namespace
+            )
+        secrets = await ek_client.api("v1").resource("secrets")
+        for secret in addon.list_secrets():
+            await secrets.patch(
+                secret,
+                {"metadata": {"labels": {settings.watch_label: ""}}},
+                namespace = addon.metadata.namespace
+            )
+        # Ensure the cloud identity will be watched
+        if (
+            cloud_identity and
+            settings.watch_label not in cloud_identity.metadata.get("labels", {})
+        ):
+            cloud_identity = await ek_client.patch_object(
+                cloud_identity,
+                {"metadata": {"labels": {settings.watch_label: ""}}}
+            )
+        # Ensure that the cluster is in a suitable state to proceed
         # For bootstrap addons, just wait for the control plane to be initialised
         # For non-bootstrap addons, wait for the cluster to be ready
         ready = utils.check_condition(
@@ -197,18 +229,6 @@ async def handle_addon_updated(addon, **kwargs):
                 f"cluster '{addon.spec.cluster_name}' is not ready",
                 delay = settings.temporary_error_delay
             )
-        # Get the infra cluster for the CAPI cluster
-        infra_cluster = await fetch_ref(
-            cluster.spec["infrastructureRef"],
-            cluster.metadata.namespace
-        )
-        # Get the cloud identity for the cluster, if it exists
-        # It is made available to templates in case they need to configure access to the host cloud
-        id_ref = infra_cluster.spec.get("identityRef")
-        if id_ref:
-            cloud_identity = await fetch_ref(id_ref, cluster.metadata.namespace)
-        else:
-            cloud_identity = None
         # The kubeconfig for the cluster is in a secret
         secret = await k8s.Secret(ek_client).fetch(
             f"{cluster.metadata.name}-kubeconfig",
@@ -334,74 +354,70 @@ def compute_checksum(data):
     return hashlib.sha256(data_str).hexdigest()
 
 
-async def annotate_addon(addon, annotation, value):
+async def handle_config_event(type, name, namespace, body, annotation_prefix):
     """
-    Applies the given annotation to the specified addon if it is not already present.
+    Handles an event for a watched configmap or secret by updating annotations
+    using the specified prefix.
     """
-    existing = addon.metadata.annotations.get(annotation)
-    if existing and existing == value:
-        return
-    ekapi = ek_client.api(addon.api_version)
-    resource = await ekapi.resource(addon._meta.plural_name)
-    try:
-        _ = await resource.patch(
-            addon.metadata.name,
-            { "metadata": { "annotations": { annotation: value } } },
-            namespace = addon.metadata.namespace
-        )
-    except ApiError as exc:
-        # If the annotation doesn't exist, that is fine
-        if exc.status_code != 404:
-            raise
+    # Compute the annotation value
+    if type == "DELETED":
+        # If the config was deleted, indicate that in the annotation
+        annotation_value = "deleted"
+    else:
+        # Otherwise, compute the checksum of the config data
+        data = body.get("data", {})
+        data_str = ";".join(sorted(f"{k}={v}" for k, v in data.items())).encode()
+        annotation_value = hashlib.sha256(data_str).hexdigest()
+    # Update any addons that depend on the config
+    for crd in registry:
+        preferred_version = next(k for k, v in crd.versions.items() if v.storage)
+        ekapi = ek_client.api(f"{crd.api_group}/{preferred_version}")
+        resource = await ekapi.resource(crd.plural_name)
+        async for addon_obj in resource.list(
+            labels = {f"{annotation_prefix}/{name}": PRESENT},
+            namespace = namespace
+        ):
+            addon = registry.get_model_instance(addon_obj)
+            annotation = f"{annotation_prefix}/{name}"
+            # If the annotation is already set to the correct value, we are done
+            if addon.metadata.annotations.get(annotation) == annotation_value:
+                continue
+            # Otherwise, try to patch the annotation for the addon
+            try:
+                _ = await resource.patch(
+                    addon.metadata.name,
+                    {"metadata": {"annotations": {annotation: annotation_value}}},
+                    namespace = addon.metadata.namespace
+                )
+            except ApiError as exc:
+                # If the addon got deleted, that is fine
+                if exc.status_code != 404:
+                    raise
 
 
 @kopf.on.event("configmap", labels = { settings.watch_label: kopf.PRESENT })
 async def handle_configmap_event(type, name, namespace, body, **kwargs):
     """
-    Executes every time a configmap is changed.
+    Executes every time a watched configmap is changed.
     """
-    if type == "DELETED":
-        # If the secret was deleted, indicate that in the annotation
-        annotation = "deleted"
-    else:
-        # Compute the checksum of the configmap
-        annotation = compute_checksum(body.get("data", {}))
-    # For each addon type, check if there are any addons that depend on the configmap
-    for crd in registry:
-        preferred_version = next(k for k, v in crd.versions.items() if v.storage)
-        ekapi = ek_client.api(f"{crd.api_group}/{preferred_version}")
-        resource = await ekapi.resource(crd.plural_name)
-        async for addon_data in resource.list(namespace = namespace):
-            addon = registry.get_model_instance(addon_data)
-            if addon.uses_configmap(name):
-                await annotate_addon(
-                    addon,
-                    f"{settings.configmap_annotation_prefix}/{name}",
-                    annotation
-                )
+    await handle_config_event(
+        type,
+        name,
+        namespace,
+        body,
+        settings.configmap_annotation_prefix
+    )
 
 
 @kopf.on.event("secret", labels = { settings.watch_label: kopf.PRESENT })
-async def handle_secret_event(name, namespace, body, **kwargs):
+async def handle_secret_event(type, name, namespace, body, **kwargs):
     """
-    Executes every time a secret is changed.
+    Executes every time a watched secret is changed.
     """
-    if type == "DELETED":
-        # If the secret was deleted, indicate that in the annotation
-        annotation = "deleted"
-    else:
-        # Compute the checksum of the configmap
-        annotation = compute_checksum(body.get("data", {}))
-    # For each addon type, check if there are any addons that depend on the secret
-    for crd in registry:
-        preferred_version = next(k for k, v in crd.versions.items() if v.storage)
-        ekapi = ek_client.api(f"{crd.api_group}/{preferred_version}")
-        resource = await ekapi.resource(crd.plural_name)
-        async for addon_data in resource.list(namespace = namespace):
-            addon = registry.get_model_instance(addon_data)
-            if addon.uses_secret(name):
-                await annotate_addon(
-                    addon,
-                    f"{settings.secret_annotation_prefix}/{name}",
-                    annotation
-                )
+    await handle_config_event(
+        type,
+        name,
+        namespace,
+        body,
+        settings.secret_annotation_prefix
+    )
