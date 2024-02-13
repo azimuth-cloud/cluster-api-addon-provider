@@ -349,7 +349,8 @@ class Addon(CustomResource, abstract = True):
     async def init_metadata(
         self,
         ek_client: AsyncClient,
-        cluster: typing.Dict[str, typing.Any]
+        cluster: typing.Dict[str, typing.Any],
+        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]]
     ):
         previous_labels = dict(self.metadata.labels)
         # Make sure that the cluster owns the addon
@@ -363,6 +364,30 @@ class Addon(CustomResource, abstract = True):
             settings.cluster_label: cluster.metadata.name,
             settings.release_namespace_label: self.spec.target_namespace,
             settings.release_name_label: release_name,
+        })
+        # If the cloud identity is a configmap or secret in the same namespace, add a label
+        # that allows us to filter for it later
+        if (
+            cloud_identity["apiVersion"] == "v1" and
+            cloud_identity["kind"] in {"ConfigMap", "Secret"} and
+            cloud_identity["metadata"]["namespace"] == self.metadata.namespace
+        ):
+            cloud_identity_label_prefix = (
+                settings.configmap_annotation_prefix
+                if cloud_identity["kind"] == "ConfigMap"
+                else settings.secret_annotation_prefix
+            )
+            cloud_identity_name = cloud_identity["metadata"]["name"]
+            cloud_identity_label = f"{cloud_identity_label_prefix}/{cloud_identity_name}"
+            self.metadata.labels[cloud_identity_label] = ""
+        # Add labels that allow us to filter by the configmaps and secrets that we reference
+        self.metadata.labels.update({
+            f"{settings.configmap_annotation_prefix}/{name}": ""
+            for name in self.list_configmaps()
+        })
+        self.metadata.labels.update({
+            f"{settings.secret_annotation_prefix}/{name}": ""
+            for name in self.list_secrets()
         })
         labels_updated = self.metadata.labels == previous_labels
         # Apply the patch if required
@@ -400,15 +425,15 @@ class Addon(CustomResource, abstract = True):
         # Reset the message unless the phase is failed
         self.status.failure_message = message if phase == AddonPhase.FAILED else ""
 
-    def uses_configmap(self, name: str):
+    def list_configmaps(self) -> typing.List[str]:
         """
-        Returns True if this addon uses the named configmap, False otherwise.
+        Returns a list of configmaps consumed by this addon.
         """
         raise NotImplementedError
 
-    def uses_secret(self, name: str):
+    def list_secrets(self) -> typing.List[str]:
         """
-        Returns True if this addon uses the named secret, False otherwise.
+        Returns a list of secrets consumed by this addon.
         """
         raise NotImplementedError
 

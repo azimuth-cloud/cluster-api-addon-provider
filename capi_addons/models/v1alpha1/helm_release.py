@@ -240,25 +240,19 @@ class HelmRelease(
         description = "The specification for the Helm release."
     )
 
-    def uses_configmap(self, name: str):
-        for source in self.spec.values_sources:
-            if (
-                isinstance(source, HelmValuesConfigMapSource) and
-                source.config_map.name == name
-            ):
-                return True
-        else:
-            return False
+    def list_configmaps(self):
+        return [
+            source.config_map.name
+            for source in self.spec.values_sources
+            if isinstance(source, HelmValuesConfigMapSource)
+        ]
 
-    def uses_secret(self, name: str):
-        for source in self.spec.values_sources:
-            if (
-                isinstance(source, HelmValuesSecretSource) and
-                source.secret.name == name
-            ):
-                return True
-        else:
-            return False
+    def list_secrets(self):
+        return [
+            source.secret.name
+            for source in self.spec.values_sources
+            if isinstance(source, HelmValuesSecretSource)
+        ]
 
     def get_chart(
         self,

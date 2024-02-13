@@ -83,38 +83,6 @@ The following custom filters are also made available to templates in addition to
   * `b64decode`  
     Decodes the given base64-encoded data and returns a UTF-8 string.
 
-## Triggering an upgrade on ConfigMap or Secret change
-
-A `ConfigMap` or `Secret` that is referenced by an addon may be changed without
-changing the actual addon resource itself. In this case, we would like for the
-change to the `ConfigMap` or `Secret` to trigger an upgrade for the addon.
-
-However the overhead of watching all `ConfigMap`s and `Secret`s just in case one
-of them is referenced by an addon is a lot, as is setting up individual watches on
-the objects referenced by an addon.
-
-`cluster-api-addon-provider` supports adding the label `addons.stackhpc.com/watch`
-to `ConfigMap`s and `Secret`s. Objects with this label are watched for changes and
-an upgrade of the addon that references them is triggered. This is done by adding
-an annotation to the addon containing the checksum of the `ConfigMap` or `Secret`
-data, which in turn triggers the upgrade.
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: my-addon-config
-  labels:
-    addons.stackhpc.com/watch: ""
-data:
-  # ... data here ...
-```
-
-Alternatively, you can make modifications to the addon yourself when `ConfigMap`
-or `Secret` data changes, either by applying an annotation to the addon yourself
-or by changing the name of the `ConfigMap` or `Secret` and hence the name
-referenced in the addon.
-
 ## HelmRelease
 
 To install a Helm chart onto a Cluster API cluster, you can create a `HelmRelease` in
