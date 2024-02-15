@@ -56,12 +56,31 @@ async def apply_settings(**kwargs):
         prefix = settings.annotation_prefix,
         key = "last-handled-configuration",
     )
-    try:
-        for crd in registry:
+    kopf_settings.watching.client_timeout = settings.watch_timeout
+    # Apply the CRDs
+    for crd in registry:
+        try:
             await ek_client.apply_object(crd.kubernetes_resource())
-    except Exception:
-        logger.exception("error applying CRDs - exiting")
-        sys.exit(1)
+        except Exception:
+            logger.exception("error applying CRD %s.%s - exiting", crd.plural_name, crd.api_group)
+            sys.exit(1)
+    # Wait for the APIs for our CRDs to become available
+    # This should prevent the operator failing on first start
+    # We loop infinitely and rely on the startup probe to restart us
+    for crd in registry:
+        logger.info("waiting for %s.%s to become available", crd.plural_name, crd.api_group)
+        preferred_version = next(k for k, v in crd.versions.items() if v.storage)
+        api_version = f"{crd.api_group}/{preferred_version}"
+        while True:
+            try:
+                _ = await ek_client.get(f"/apis/{api_version}/{crd.plural_name}")
+            except ApiError as exc:
+                if exc.status_code in {403, 404}:
+                    await asyncio.sleep(0.1)
+                else:
+                    raise
+            else:
+                break
 
 
 @kopf.on.cleanup()

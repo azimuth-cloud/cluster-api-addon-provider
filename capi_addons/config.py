@@ -48,6 +48,9 @@ class Configuration(
     #: The field manager name to use for server-side apply
     easykube_field_manager: constr(min_length = 1) = "cluster-api-addon-provider"
 
+    #: The amount of time (seconds) before a watch is forcefully restarted
+    watch_timeout: conint(gt = 0) = 600
+
     #: The delay to use for temporary errors by default
     temporary_error_delay: conint(gt = 0) = 15
 
