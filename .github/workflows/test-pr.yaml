@@ -62,6 +62,7 @@ jobs:
         with:
           os-clouds: ${{ secrets.OS_CLOUDS }}
           environment-prefix: addons-ci
+          target-cloud: ${{ vars.TARGET_CLOUD }}
           # Use the version of the chart that we just built
           # We also don't need all the tests
           # The Kubernetes test is sufficient to confirm the addon provider is working
