@@ -389,7 +389,7 @@ class Addon(CustomResource, abstract = True):
             f"{settings.secret_annotation_prefix}/{name}": ""
             for name in self.list_secrets()
         })
-        labels_updated = self.metadata.labels == previous_labels
+        labels_updated = self.metadata.labels != previous_labels
         # Apply the patch if required
         if owner_references_updated or labels_updated:
             ekapi = ek_client.api(self.api_version)

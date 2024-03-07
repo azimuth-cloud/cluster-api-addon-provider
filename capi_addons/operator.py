@@ -180,6 +180,8 @@ async def until_deleted(addon):
 # changed, the upgrade logic will be executed for the new configmap or secret content
 @addon_handler(kopf.on.update, field = "metadata.annotations")
 @addon_handler(kopf.on.update, field = "spec")
+# Also run on resume - if nothing has changed, no Helm release will be made
+@addon_handler(kopf.on.resume)
 async def handle_addon_updated(addon, **kwargs):
     """
     Executes whenever an addon is created or the annotations or spec of an addon are updated.
