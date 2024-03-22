@@ -57,6 +57,10 @@ jobs:
             clusterapi_addon_provider_chart_version: ${{ needs.publish_artifacts.outputs.chart-version }}
             generate_tests_caas_suite_enabled: false
             generate_tests_kubernetes_apps_suite_enabled: false
+        # GitHub terminates jobs after 6 hours
+        # We don't want jobs to acquire the lock then get timed out before they can finish
+        # So wait a maximum of 3 hours to acquire the lock, leaving 3 hours for other tasks in the job
+        timeout-minutes: 180
 
       # Provision Azimuth using the azimuth-ops version under test
       - name: Provision Azimuth
