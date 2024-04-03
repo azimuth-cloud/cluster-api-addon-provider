@@ -8,8 +8,6 @@ from pydantic.json import pydantic_encoder
 
 import yaml
 
-from easykube.rest.client import JsonEncoder
-
 from . import utils
 
 
@@ -32,7 +30,7 @@ class Loader:
                 json.loads(
                     json.dumps(
                         obj,
-                        default = JsonEncoder(pydantic_encoder)
+                        default = pydantic_encoder
                     )
                 )
             ),
