@@ -155,13 +155,7 @@ async def fetch_ref(ref, default_namespace):
     name = ref["name"]
     namespace = ref.get("namespace", default_namespace)
     resource = await ek_client.api(api_version).resource(kind)
-    try:
-        return await resource.fetch(name, namespace = namespace)
-    except ApiError as exc:
-        if exc.status_code == 404:
-            return None
-        else:
-            raise
+    return await resource.fetch(name, namespace = namespace)
 
 
 async def until_deleted(addon):
