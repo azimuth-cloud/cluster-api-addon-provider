@@ -149,8 +149,19 @@ async def fetch_ref(ref, default_namespace):
     """
     Returns the object that is referred to by a ref.
     """
-    resource = await ek_client.api(ref.get("apiVersion", "v1")).resource(ref["kind"])
-    return await resource.fetch(ref["name"], namespace = ref.get("namespace", default_namespace))
+    # By default, look for a secret unless otherwise specified
+    api_version = ref.get("apiVersion", "v1")
+    kind = ref.get("kind", "Secret")
+    name = ref["name"]
+    namespace = ref.get("namespace", default_namespace)
+    resource = await ek_client.api(api_version).resource(kind)
+    try:
+        return await resource.fetch(name, namespace = namespace)
+    except ApiError as exc:
+        if exc.status_code == 404:
+            return None
+        else:
+            raise
 
 
 async def until_deleted(addon):
@@ -232,9 +243,12 @@ async def handle_addon_updated(addon, **kwargs):
                 {"metadata": {"labels": {settings.watch_label: ""}}},
                 namespace = addon.metadata.namespace
             )
-        # Ensure the cloud identity will be watched
+        # If the cloud identity is a secret or configmap in the same namespace, watch it
         if (
             cloud_identity and
+            cloud_identity["apiVersion"] == "v1" and
+            cloud_identity["kind"] in {"ConfigMap", "Secret"} and
+            cloud_identity["metadata"]["namespace"] == cluster.metadata.namespace and
             settings.watch_label not in cloud_identity.metadata.get("labels", {})
         ):
             cloud_identity = await ek_client.patch_object(
