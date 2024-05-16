@@ -622,6 +622,8 @@ class Addon(CustomResource, abstract = True):
                     values,
                     cleanup_on_fail = True,
                     namespace = self.spec.target_namespace,
+                    # Always reset to the values from the chart then apply our changes on top
+                    reset_values = True,
                     timeout = self.spec.release_timeout,
                     wait = True
                 )
