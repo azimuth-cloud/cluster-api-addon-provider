@@ -5,6 +5,24 @@ from pydantic import Field, conint, constr, field_validator, ValidationInfo
 from configomatic import Configuration as BaseConfiguration, Section, LoggingConfiguration
 
 
+class EasykubeClientConfiguration(Section):
+    """
+    Configuration options for the easykube client.
+    """
+    #: The field manager name to use for server-side apply
+    field_manager: constr(min_length = 1) = "cluster-api-addon-provider"
+    #: The maximum number of connections in the connection pool
+    pool_max_connections: conint(gt = 0) = 200
+    #: The amount of time to wait for a socket to connect
+    connect_timeout: conint(gt = 0) = 5
+    #: The amount of time to wait for a read operation
+    read_timeout: conint(gt = 0) = 5
+    #: The amount of time to wait for a write operation
+    write_timeout: conint(gt = 0) = 5
+    #: The default timeout for retrieving a connection from the pool
+    pool_timeout: conint(gt = 0) = 120
+
+
 class HelmClientConfiguration(Section):
     """
     Configuration for the Helm client.
@@ -45,14 +63,14 @@ class Configuration(
         default_factory = lambda: ["cluster-api", "capi-addons"]
     )
 
-    #: The field manager name to use for server-side apply
-    easykube_field_manager: constr(min_length = 1) = "cluster-api-addon-provider"
-
     #: The amount of time (seconds) before a watch is forcefully restarted
     watch_timeout: conint(gt = 0) = 600
 
     #: The delay to use for temporary errors by default
     temporary_error_delay: conint(gt = 0) = 15
+
+    #: The easykube client configuration
+    ek_client: EasykubeClientConfiguration = Field(default_factory = EasykubeClientConfiguration)
 
     #: The Helm client configuration
     helm_client: HelmClientConfiguration = Field(default_factory = HelmClientConfiguration)

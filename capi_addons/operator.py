@@ -7,6 +7,7 @@ import logging
 import sys
 import tempfile
 
+import httpx
 import kopf
 
 from easykube import Configuration, ApiError, resources as k8s, PRESENT
@@ -33,7 +34,16 @@ from pydantic.json import pydantic_encoder
 ek_client = (
     Configuration
         .from_environment(json_encoder = pydantic_encoder)
-        .async_client(default_field_manager = settings.easykube_field_manager)
+        .async_client(
+            default_field_manager = settings.ek_client.field_manager,
+            limits = httpx.Limits(max_connections = settings.ek_client.pool_max_connections),
+            timeout = httpx.Timeout(
+                connect = settings.ek_client.connect_timeout,
+                read = settings.ek_client.read_timeout,
+                write = settings.ek_client.write_timeout,
+                pool = settings.ek_client.pool_timeout
+            )
+        )
 )
 
 
@@ -129,7 +139,18 @@ async def clients_for_cluster(kubeconfig_secret):
         ek_client_target = (
             Configuration
                 .from_kubeconfig_data(kubeconfig_data, json_encoder = pydantic_encoder)
-                .async_client(default_field_manager = settings.easykube_field_manager)
+                .async_client(
+                    default_field_manager = settings.ek_client.field_manager,
+                    limits = httpx.Limits(
+                        max_connections = settings.ek_client.pool_max_connections
+                    ),
+                    timeout = httpx.Timeout(
+                        connect = settings.ek_client.connect_timeout,
+                        read = settings.ek_client.read_timeout,
+                        write = settings.ek_client.write_timeout,
+                        pool = settings.ek_client.pool_timeout
+                    )
+                )
         )
         # Get a Helm client for the target cluster
         helm_client = HelmClient(
