@@ -41,7 +41,7 @@ def create_ek_client():
 
 
 # Create a registry of custom resources and populate it from the models module
-registry = CustomResourceRegistry(settings.api_group, settings.crd_categories)
+registry = CustomResourceRegistry(settings.api_group)
 registry.discover_models(models)
 
 
@@ -60,34 +60,6 @@ async def apply_settings(**kwargs):
         key = "last-handled-configuration",
     )
     kopf_settings.watching.client_timeout = settings.watch_timeout
-    async with create_ek_client() as ek_client:
-        # Apply the CRDs
-        for crd in registry:
-            try:
-                await ek_client.apply_object(crd.kubernetes_resource())
-            except Exception:
-                logger.exception(
-                    "error applying CRD %s.%s - exiting",
-                    crd.plural_name,
-                    crd.api_group
-                )
-                sys.exit(1)
-        # Give Kubernetes a chance to create the APIs for the CRDs
-        await asyncio.sleep(0.5)
-        # Check to see if the APIs for the CRDs are up
-        # If they are not, the kopf watches will not start properly so we exit and get restarted
-        for crd in registry:
-            preferred_version = next(k for k, v in crd.versions.items() if v.storage)
-            api_version = f"{crd.api_group}/{preferred_version}"
-            try:
-                _ = await ek_client.get(f"/apis/{api_version}/{crd.plural_name}")
-            except Exception:
-                logger.exception(
-                    "api for %s.%s not available - exiting",
-                    crd.plural_name,
-                    crd.api_group
-                )
-                sys.exit(1)
 
 
 def addon_handler(register_fn, **kwargs):

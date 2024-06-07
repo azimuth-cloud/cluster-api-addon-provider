@@ -84,6 +84,27 @@ jobs:
           # when determining the number of commits since the last tag
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python packages
+        run: |
+          set -e
+          python -m pip install --upgrade pip
+          python -m pip install --no-deps -r ./requirements.txt
+          python -m pip install --no-deps -e .
+
+      - name: Generate CRDs
+        run: |
+          kcr_generate \
+            capi_addons.models \
+            addons.stackhpc.com \
+            ./chart/files \
+            --category cluster-api \
+            --category capi-addons
+
       - name: Get SemVer version for current commit
         id: semver
         uses: stackhpc/github-actions/semver@master

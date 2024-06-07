@@ -40,10 +40,6 @@ class Configuration(
     api_group: constr(min_length = 1) = "addons.stackhpc.com"
     #: The prefix to use for operator annotations
     annotation_prefix: constr(min_length = 1) = Field(None, validate_default = True)
-    #: A list of categories to place CRDs into
-    crd_categories: t.List[constr(min_length = 1)] = Field(
-        default_factory = lambda: ["cluster-api", "capi-addons"]
-    )
 
     #: The field manager name to use for server-side apply
     easykube_field_manager: constr(min_length = 1) = "cluster-api-addon-provider"

@@ -56,3 +56,26 @@ Selector labels
 app.kubernetes.io/name: {{ include "cluster-api-addon-provider.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Produces the metadata for a CRD.
+*/}}
+{{- define "cluster-api-addon-provider.crd.metadata" }}
+metadata:
+  labels: {{ include "cluster-api-addon-provider.labels" . | nindent 4 }}
+  {{- if .Values.crds.keep }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+{{- end }}
+
+{{/*
+Loads a CRD from the specified file and merges in the metadata.
+*/}}
+{{- define "cluster-api-addon-provider.crd" }}
+{{- $ctx := index . 0 }}
+{{- $path := index . 1 }}
+{{- $crd := $ctx.Files.Get $path | fromYaml }}
+{{- $metadata := include "cluster-api-addon-provider.crd.metadata" $ctx | fromYaml }}
+{{- merge $crd $metadata | toYaml }}
+{{- end }}
