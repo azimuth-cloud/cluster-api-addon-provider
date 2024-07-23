@@ -20,7 +20,7 @@ RUN set -ex; \
 FROM ubuntu:jammy AS python-builder
 
 RUN apt-get update && \
-    apt-get install -y python3 python3-venv && \
+    apt-get install -y git python3 python3-venv && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /venv && \
@@ -66,12 +66,4 @@ COPY --from=python-builder /venv /venv
 
 USER $APP_UID
 ENTRYPOINT ["tini", "-g", "--"]
-CMD [ \
-    "/venv/bin/kopf", \
-    "run", \
-    "--module", \
-    "capi_addons.operator", \
-    "--all-namespaces", \
-    "--liveness", \
-    "http://0.0.0.0:8000/healthz" \
-]
+CMD ["/venv/bin/cluster-api-addon-provider"]
