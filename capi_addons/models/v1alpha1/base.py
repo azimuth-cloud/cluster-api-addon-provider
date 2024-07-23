@@ -378,15 +378,15 @@ class Addon(CustomResource, abstract = True):
                 else settings.secret_annotation_prefix
             )
             cloud_identity_name = cloud_identity["metadata"]["name"]
-            cloud_identity_label = f"{cloud_identity_label_prefix}/{cloud_identity_name}"
+            cloud_identity_label = f"{cloud_identity_name}.{cloud_identity_label_prefix}/uses"
             self.metadata.labels[cloud_identity_label] = ""
         # Add labels that allow us to filter by the configmaps and secrets that we reference
         self.metadata.labels.update({
-            f"{settings.configmap_annotation_prefix}/{name}": ""
+            f"{name}.{settings.configmap_annotation_prefix}/uses": ""
             for name in self.list_configmaps()
         })
         self.metadata.labels.update({
-            f"{settings.secret_annotation_prefix}/{name}": ""
+            f"{name}.{settings.secret_annotation_prefix}/uses": ""
             for name in self.list_secrets()
         })
         labels_updated = self.metadata.labels != previous_labels
@@ -707,7 +707,7 @@ class EphemeralChartAddon(Addon, abstract = True):
         cluster: typing.Dict[str, typing.Any],
         infra_cluster: typing.Dict[str, typing.Any],
         cloud_identity: typing.Optional[typing.Dict[str, typing.Any]]
-    ) -> contextlib.AbstractAsyncContextManager[Chart]:
+    ) -> typing.AsyncIterator[Chart]:
         # Write the files for the ephemeral chart
         with tempfile.TemporaryDirectory() as chart_directory:
             # Create the directories for the CRDs and templates

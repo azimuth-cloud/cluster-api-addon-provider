@@ -66,12 +66,4 @@ COPY --from=python-builder /venv /venv
 
 USER $APP_UID
 ENTRYPOINT ["tini", "-g", "--"]
-CMD [ \
-    "/venv/bin/kopf", \
-    "run", \
-    "--module", \
-    "capi_addons.operator", \
-    "--all-namespaces", \
-    "--liveness", \
-    "http://0.0.0.0:8000/healthz" \
-]
+CMD ["/venv/bin/cluster-api-addon-provider"]
