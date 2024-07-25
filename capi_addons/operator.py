@@ -406,7 +406,7 @@ async def handle_config_event(ek_client, type, name, namespace, body, annotation
         ekapi = ek_client.api(f"{crd.api_group}/{preferred_version}")
         resource = await ekapi.resource(crd.plural_name)
         async for addon_obj in resource.list(
-            labels = {f"{annotation_prefix}/{name}": PRESENT},
+            labels = {f"{name}.{annotation_prefix}/uses": PRESENT},
             namespace = namespace
         ):
             addon = registry.get_model_instance(addon_obj)
