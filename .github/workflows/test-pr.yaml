@@ -29,8 +29,8 @@ jobs:
   fail_on_remote:
     runs-on: ubuntu-latest
     steps:
-      - name: PR must be from a branch in the stackhpc/cluster-api-addon-provider repo
-        run: exit ${{ github.event.pull_request.head.repo.full_name == 'stackhpc/cluster-api-addon-provider' && '0' || '1' }}
+      - name: PR must be from a branch in the azimuth-cloud/cluster-api-addon-provider repo
+        run: exit ${{ github.event.pull_request.head.repo.full_name == 'azimuth-cloud/cluster-api-addon-provider' && '0' || '1' }}
 
   publish_artifacts:
     needs: [fail_on_remote]
