@@ -31,14 +31,12 @@ and OCI repositories) will likely be added in the future.
 The Cluster API addon provider can be installed using [Helm](https://helm.sh):
 
 ```sh
-helm repo add capi-addons https://stackhpc.github.io/cluster-api-addon-provider
+helm repo add capi-addons https://azimuth-cloud.github.io/cluster-api-addon-provider
 
-# Use the latest version from the main branch
 helm upgrade \
   cluster-api-addon-provider \
   capi-addons/cluster-api-addon-provider \
-  --install \
-  --version ">=0.1.0-dev.0.main.0,<0.1.0-dev.0.main.9999999999"
+  --install
 ```
 
 ## Templates

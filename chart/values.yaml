@@ -5,7 +5,7 @@ config: {}
 
 # The operator image to use
 image:
-  repository: ghcr.io/stackhpc/cluster-api-addon-provider
+  repository: ghcr.io/azimuth-cloud/cluster-api-addon-provider
   pullPolicy: IfNotPresent
   tag: ""  # Defaults to appVersion
 
