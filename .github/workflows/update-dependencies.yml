@@ -26,20 +26,20 @@ jobs:
 
       - name: Check for most recent GitHub release
         id: next
-        uses: stackhpc/github-actions/github-latest-release@master
+        uses: azimuth-cloud/github-actions/github-latest-release@master
         with:
           repository: ${{ matrix.repository }}
           prereleases: ${{ matrix.prereleases || 'no' }}
 
       - name: Update dependency key
-        uses: stackhpc/github-actions/config-update@master
+        uses: azimuth-cloud/github-actions/config-update@master
         with:
           path: ${{ matrix.path }}
           updates: |
             ${{ matrix.version_jsonpath }}=${{ steps.next.outputs.version }}
 
       - name: Generate app token for PR
-        uses: stackhpc/github-actions/generate-app-token@master
+        uses: azimuth-cloud/github-actions/generate-app-token@master
         id: generate-app-token
         with:
           repository: ${{ github.repository }}
