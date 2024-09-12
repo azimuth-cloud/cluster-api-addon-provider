@@ -1,0 +1,10 @@
+{{- if .Values.trustBundle }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cluster-api-addon-provider.fullname" . }}-trust-bundle
+  labels: {{ include "cluster-api-addon-provider.labels" . | nindent 4 }}
+data:
+  ca-certificates.crt: |
+    {{- nindent 4 .Values.trustBundle }}
+{{- end }}

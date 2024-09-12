@@ -3,6 +3,9 @@
 # The vast majority of cases will not need to specify any configuration
 config: {}
 
+# A bundle of trusted CAs to use instead of the defaults
+trustBundle:
+
 # The operator image to use
 image:
   repository: ghcr.io/azimuth-cloud/cluster-api-addon-provider

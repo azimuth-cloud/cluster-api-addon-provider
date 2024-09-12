@@ -32,6 +32,11 @@ spec:
             - name: etc-capi-addon-provider
               mountPath: /etc/capi-addon-provider
               readOnly: true
+            {{- if .Values.trustBundle }}
+            - name: trust-bundle
+              mountPath: /etc/ssl/certs
+              readOnly: true
+            {{- end }}
             - name: tmp
               mountPath: /tmp
       {{- with .Values.nodeSelector }}
@@ -47,6 +52,11 @@ spec:
         - name: etc-capi-addon-provider
           configMap:
             name: {{ include "cluster-api-addon-provider.fullname" . }}
+        {{- if .Values.trustBundle }}
+        - name: trust-bundle
+          configMap:
+            name: {{ include "cluster-api-addon-provider.fullname" . }}-trust-bundle
+        {{- end }}
         # Mount a writable directory at /tmp
         - name: tmp
           emptyDir: {}
