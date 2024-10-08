@@ -56,6 +56,10 @@ RUN apt-get update && \
 # Don't buffer stdout and stderr as it breaks realtime logging
 ENV PYTHONUNBUFFERED 1
 
+# Make httpx use the system trust roots
+# By default, this means we use the CAs from the ca-certificates package
+ENV SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt
+
 # Tell Helm to use /tmp for mutable data
 ENV HELM_CACHE_HOME /tmp/helm/cache
 ENV HELM_CONFIG_HOME /tmp/helm/config
@@ -66,12 +70,4 @@ COPY --from=python-builder /venv /venv
 
 USER $APP_UID
 ENTRYPOINT ["tini", "-g", "--"]
-CMD [ \
-    "/venv/bin/kopf", \
-    "run", \
-    "--module", \
-    "capi_addons.operator", \
-    "--all-namespaces", \
-    "--liveness", \
-    "http://0.0.0.0:8000/healthz" \
-]
+CMD ["/venv/bin/kopf", "run", "--module", "capi_addons.operator", "--all-namespaces"]
