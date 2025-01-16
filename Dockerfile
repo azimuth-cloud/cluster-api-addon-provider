@@ -4,7 +4,7 @@ RUN apt-get update && \
     apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
 
-ARG HELM_VERSION=v3.16.4
+ARG HELM_VERSION=v3.17.0
 RUN set -ex; \
     OS_ARCH="$(uname -m)"; \
     case "$OS_ARCH" in \
