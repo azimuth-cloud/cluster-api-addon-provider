@@ -243,6 +243,15 @@ class AddonSpec(schema.BaseModel):
         default_factory = LifecycleHooks,
         description = "Lifecycle hooks for the addon."
     )
+    paused: bool = Field(
+        False,
+        description = (
+            "Indicates if reconciliation of the addon is paused. "
+            "When reconciliation of an addon is paused, changes made to the addon are not acted "
+            "on by the operator. This includes deleting an addon, in which case the resources "
+            "deployed for the addon WILL NOT be removed from the target cluster."
+        )
+    )
 
 
 class AddonPhase(str, schema.Enum):

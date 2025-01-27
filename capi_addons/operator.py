@@ -184,7 +184,7 @@ async def until_deleted(addon):
 @addon_handler(kopf.on.update, field = "spec")
 # Also run on resume - if nothing has changed, no Helm release will be made
 @addon_handler(kopf.on.resume)
-async def handle_addon_updated(addon, **kwargs):
+async def handle_addon_updated(addon, logger, **kwargs):
     """
     Executes whenever an addon is created or the annotations or spec of an addon are updated.
 
@@ -260,6 +260,11 @@ async def handle_addon_updated(addon, **kwargs):
                     f"cluster '{addon.spec.cluster_name}' is not ready",
                     delay = settings.temporary_error_delay
                 )
+            # At this point initialisation has happened and we are in a position to perform an
+            # action, so check if we are paused
+            if addon.spec.paused:
+                logger.warning("no action taken as addon is paused")
+                return
             # The kubeconfig for the cluster is in a secret
             secret = await k8s.Secret(ek_client).fetch(
                 f"{cluster.metadata.name}-kubeconfig",
@@ -328,7 +333,7 @@ async def handle_addon_updated(addon, **kwargs):
 
 
 @addon_handler(kopf.on.delete)
-async def handle_addon_deleted(addon, **kwargs):
+async def handle_addon_deleted(addon, logger, **kwargs):
     """
     Executes whenever an addon is deleted.
     """
@@ -361,8 +366,11 @@ async def handle_addon_deleted(addon, **kwargs):
                 return
             else:
                 raise
-        clients = clients_for_cluster(secret)
-        async with clients as (ek_client_target, helm_client):
+        # If we get to here we are about to perform an action, so check if we are paused
+        if addon.spec.paused:
+            logger.warning("no action taken as addon is paused")
+            return
+        async with clients_for_cluster(secret) as (ek_client_target, helm_client):
             try:
                 await addon.uninstall(ek_client, ek_client_target, helm_client)
             except ApiError as exc:
