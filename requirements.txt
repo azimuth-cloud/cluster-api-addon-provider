@@ -23,7 +23,7 @@ MarkupSafe==3.0.2
 multidict==6.1.0
 propcache==0.2.1
 pydantic==2.10.6
-pydantic_core==2.28.0
+pydantic_core==2.29.0
 pyhelm3==0.4.0
 python-json-logger==3.2.1
 PyYAML==6.0.2
