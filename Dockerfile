@@ -4,7 +4,7 @@ RUN apt-get update && \
     apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
 
-ARG HELM_VERSION=v3.17.0
+ARG HELM_VERSION=v3.17.3
 RUN set -ex; \
     OS_ARCH="$(uname -m)"; \
     case "$OS_ARCH" in \
@@ -27,10 +27,10 @@ RUN python3 -m venv /venv && \
     /venv/bin/pip install -U pip setuptools
 
 COPY requirements.txt /app/requirements.txt
-RUN  /venv/bin/pip install --no-deps --requirement /app/requirements.txt
+RUN  /venv/bin/pip install --requirement /app/requirements.txt
 
 COPY . /app
-RUN /venv/bin/pip install --no-deps /app
+RUN /venv/bin/pip install /app
 
 
 FROM ubuntu:jammy
