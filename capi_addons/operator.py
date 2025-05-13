@@ -30,14 +30,15 @@ template_loader = template.Loader()
 
 # Initialise an easykube config object from the environment
 from pydantic.json import pydantic_encoder
-ek_config = Configuration.from_environment(json_encoder = pydantic_encoder)
+
+ek_config = Configuration.from_environment(json_encoder=pydantic_encoder)
 
 
 def create_ek_client():
     """
     Returns an easykube client for the default config.
     """
-    return ek_config.async_client(default_field_manager = settings.easykube_field_manager)
+    return ek_config.async_client(default_field_manager=settings.easykube_field_manager)
 
 
 # Create a registry of custom resources and populate it from the models module
@@ -53,11 +54,11 @@ async def apply_settings(**kwargs):
     kopf_settings = kwargs["settings"]
     kopf_settings.persistence.finalizer = f"{settings.annotation_prefix}/finalizer"
     kopf_settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(
-        prefix = settings.annotation_prefix
+        prefix=settings.annotation_prefix
     )
     kopf_settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(
-        prefix = settings.annotation_prefix,
-        key = "last-handled-configuration",
+        prefix=settings.annotation_prefix,
+        key="last-handled-configuration",
     )
     kopf_settings.watching.client_timeout = settings.watch_timeout
     async with create_ek_client() as ek_client:
@@ -67,9 +68,7 @@ async def apply_settings(**kwargs):
                 await ek_client.apply_object(crd.kubernetes_resource())
             except Exception:
                 logger.exception(
-                    "error applying CRD %s.%s - exiting",
-                    crd.plural_name,
-                    crd.api_group
+                    "error applying CRD %s.%s - exiting", crd.plural_name, crd.api_group
                 )
                 sys.exit(1)
         # Give Kubernetes a chance to create the APIs for the CRDs
@@ -85,7 +84,7 @@ async def apply_settings(**kwargs):
                 logger.exception(
                     "api for %s.%s not available - exiting",
                     crd.plural_name,
-                    crd.api_group
+                    crd.api_group,
                 )
                 sys.exit(1)
 
@@ -94,19 +93,24 @@ def addon_handler(register_fn, **kwargs):
     """
     Decorator that registers a handler with kopf for every addon that is defined.
     """
+
     def decorator(func):
         @functools.wraps(func)
         async def handler(**handler_kwargs):
             # Get the model instance associated with the Kubernetes resource, making
-            # sure to account for nested addon handlers
+            # sure to account for nested addon handlers
             if "addon" not in handler_kwargs:
-                handler_kwargs["addon"] = registry.get_model_instance(handler_kwargs["body"])
+                handler_kwargs["addon"] = registry.get_model_instance(
+                    handler_kwargs["body"]
+                )
             return await func(**handler_kwargs)
+
         for crd in registry:
             preferred_version = next(k for k, v in crd.versions.items() if v.storage)
             api_version = f"{crd.api_group}/{preferred_version}"
             handler = register_fn(api_version, crd.kind, **kwargs)(handler)
         return handler
+
     return decorator
 
 
@@ -122,19 +126,17 @@ async def clients_for_cluster(kubeconfig_secret):
         kubeconfig.write(kubeconfig_data)
         kubeconfig.flush()
         # Get an easykube client for the target cluster
-        ek_client_target = (
-            Configuration
-                .from_kubeconfig_data(kubeconfig_data, json_encoder = pydantic_encoder)
-                .async_client(default_field_manager = settings.easykube_field_manager)
-        )
+        ek_client_target = Configuration.from_kubeconfig_data(
+            kubeconfig_data, json_encoder=pydantic_encoder
+        ).async_client(default_field_manager=settings.easykube_field_manager)
         # Get a Helm client for the target cluster
         helm_client = HelmClient(
-            default_timeout = settings.helm_client.default_timeout,
-            executable = settings.helm_client.executable,
-            history_max_revisions = settings.helm_client.history_max_revisions,
-            insecure_skip_tls_verify = settings.helm_client.insecure_skip_tls_verify,
-            kubeconfig = kubeconfig.name,
-            unpack_directory = settings.helm_client.unpack_directory
+            default_timeout=settings.helm_client.default_timeout,
+            executable=settings.helm_client.executable,
+            history_max_revisions=settings.helm_client.history_max_revisions,
+            insecure_skip_tls_verify=settings.helm_client.insecure_skip_tls_verify,
+            kubeconfig=kubeconfig.name,
+            unpack_directory=settings.helm_client.unpack_directory,
         )
         # Yield the clients as a tuple
         async with ek_client_target:
@@ -151,7 +153,7 @@ async def fetch_ref(ek_client, ref, default_namespace):
     name = ref["name"]
     namespace = ref.get("namespace", default_namespace)
     resource = await ek_client.api(api_version).resource(kind)
-    return await resource.fetch(name, namespace = namespace)
+    return await resource.fetch(name, namespace=namespace)
 
 
 async def until_deleted(addon):
@@ -167,8 +169,7 @@ async def until_deleted(addon):
             while True:
                 await asyncio.sleep(5)
                 addon_obj = await resource.fetch(
-                    addon.metadata.name,
-                    namespace = addon.metadata.namespace
+                    addon.metadata.name, namespace=addon.metadata.namespace
                 )
                 if addon_obj.metadata.get("deletionTimestamp"):
                     return
@@ -180,8 +181,8 @@ async def until_deleted(addon):
 # Run when the annotations are updated as well as the spec
 # This means that when we change an annotation in response to a configmap or secret being
 # changed, the upgrade logic will be executed for the new configmap or secret content
-@addon_handler(kopf.on.update, field = "metadata.annotations")
-@addon_handler(kopf.on.update, field = "spec")
+@addon_handler(kopf.on.update, field="metadata.annotations")
+@addon_handler(kopf.on.update, field="spec")
 # Also run on resume - if nothing has changed, no Helm release will be made
 @addon_handler(kopf.on.resume)
 async def handle_addon_updated(addon, logger, **kwargs):
@@ -203,20 +204,19 @@ async def handle_addon_updated(addon, logger, **kwargs):
             ekapi = await ek_client.api_preferred_version("cluster.x-k8s.io")
             resource = await ekapi.resource("clusters")
             cluster = await resource.fetch(
-                addon.spec.cluster_name,
-                namespace = addon.metadata.namespace
+                addon.spec.cluster_name, namespace=addon.metadata.namespace
             )
             # Get the infra cluster for the CAPI cluster
             infra_cluster = await fetch_ref(
-                ek_client,
-                cluster.spec["infrastructureRef"],
-                cluster.metadata.namespace
+                ek_client, cluster.spec["infrastructureRef"], cluster.metadata.namespace
             )
             # Get the cloud identity for the infra cluster, if it exists
             # It is made available to templates in case they need to configure access to the cloud
             id_ref = infra_cluster.spec.get("identityRef")
             if id_ref:
-                cloud_identity = await fetch_ref(ek_client, id_ref, cluster.metadata.namespace)
+                cloud_identity = await fetch_ref(
+                    ek_client, id_ref, cluster.metadata.namespace
+                )
             else:
                 cloud_identity = None
             # Make sure that the cluster owns the addon and the addon has the required labels
@@ -227,38 +227,38 @@ async def handle_addon_updated(addon, logger, **kwargs):
                 await configmaps.patch(
                     configmap,
                     {"metadata": {"labels": {settings.watch_label: ""}}},
-                    namespace = addon.metadata.namespace
+                    namespace=addon.metadata.namespace,
                 )
             secrets = await ek_client.api("v1").resource("secrets")
             for secret in addon.list_secrets():
                 await secrets.patch(
                     secret,
                     {"metadata": {"labels": {settings.watch_label: ""}}},
-                    namespace = addon.metadata.namespace
+                    namespace=addon.metadata.namespace,
                 )
             # If the cloud identity is a secret or configmap in the same namespace, watch it
             if (
-                cloud_identity and
-                cloud_identity["apiVersion"] == "v1" and
-                cloud_identity["kind"] in {"ConfigMap", "Secret"} and
-                cloud_identity["metadata"]["namespace"] == cluster.metadata.namespace and
-                settings.watch_label not in cloud_identity.metadata.get("labels", {})
+                cloud_identity
+                and cloud_identity["apiVersion"] == "v1"
+                and cloud_identity["kind"] in {"ConfigMap", "Secret"}
+                and cloud_identity["metadata"]["namespace"]
+                == cluster.metadata.namespace
+                and settings.watch_label
+                not in cloud_identity.metadata.get("labels", {})
             ):
                 cloud_identity = await ek_client.patch_object(
-                    cloud_identity,
-                    {"metadata": {"labels": {settings.watch_label: ""}}}
+                    cloud_identity, {"metadata": {"labels": {settings.watch_label: ""}}}
                 )
             # Ensure that the cluster is in a suitable state to proceed
-            # For bootstrap addons, just wait for the control plane to be initialised
-            # For non-bootstrap addons, wait for the cluster to be ready
+            # For bootstrap addons, just wait for the control plane to be initialised
+            # For non-bootstrap addons, wait for the cluster to be ready
             ready = utils.check_condition(
-                cluster,
-                "ControlPlaneInitialized" if addon.spec.bootstrap else "Ready"
+                cluster, "ControlPlaneInitialized" if addon.spec.bootstrap else "Ready"
             )
             if not ready:
                 raise kopf.TemporaryError(
                     f"cluster '{addon.spec.cluster_name}' is not ready",
-                    delay = settings.temporary_error_delay
+                    delay=settings.temporary_error_delay,
                 )
             # At this point initialisation has happened and we are in a position to perform an
             # action, so check if we are paused
@@ -268,7 +268,7 @@ async def handle_addon_updated(addon, logger, **kwargs):
             # The kubeconfig for the cluster is in a secret
             secret = await k8s.Secret(ek_client).fetch(
                 f"{cluster.metadata.name}-kubeconfig",
-                namespace = cluster.metadata.namespace
+                namespace=cluster.metadata.namespace,
             )
             # Get easykube and Helm clients for the target cluster and use them to deploy the addon
             async with clients_for_cluster(secret) as (ek_client_target, helm_client):
@@ -281,13 +281,13 @@ async def handle_addon_updated(addon, logger, **kwargs):
                         helm_client,
                         cluster,
                         infra_cluster,
-                        cloud_identity
+                        cloud_identity,
                     )
                 )
                 wait_for_delete_task = asyncio.create_task(until_deleted(addon))
                 done, pending = await asyncio.wait(
-                    { install_upgrade_task, wait_for_delete_task },
-                    return_when = asyncio.FIRST_COMPLETED
+                    {install_upgrade_task, wait_for_delete_task},
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
                 # Cancel the pending tasks and give them a chance to clean up
                 for task in pending:
@@ -300,12 +300,14 @@ async def handle_addon_updated(addon, logger, **kwargs):
                 for task in done:
                     _ = await task
         # Handle expected errors by converting them to kopf errors
-        # This suppresses the stack trace in logs/events
+        # This suppresses the stack trace in logs/events
         # Let unexpected errors bubble without suppressing the stack trace so they can be debugged
         except ApiError as exc:
             # 404 and 409 are recoverable
             if exc.status_code in {404, 409}:
-                raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+                raise kopf.TemporaryError(
+                    str(exc), delay=settings.temporary_error_delay
+                )
             # All other 4xx errors are probably permanent, as they are client errors
             # They can likely only be resolved by changing the spec
             elif 400 <= exc.status_code < 500:
@@ -314,17 +316,14 @@ async def handle_addon_updated(addon, logger, **kwargs):
                 raise kopf.PermanentError(str(exc))
             else:
                 raise
-        except (
-            helm_errors.ConnectionError,
-            helm_errors.CommandCancelledError
-        ) as exc:
+        except (helm_errors.ConnectionError, helm_errors.CommandCancelledError) as exc:
             # Assume connection errors are temporary
-            raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+            raise kopf.TemporaryError(str(exc), delay=settings.temporary_error_delay)
         except (
             helm_errors.ChartNotFoundError,
             helm_errors.FailedToRenderChartError,
             helm_errors.ResourceAlreadyExistsError,
-            helm_errors.InvalidResourceError
+            helm_errors.InvalidResourceError,
         ) as exc:
             # These are permanent errors that can only be resolved by changing the spec
             addon.set_phase(api.AddonPhase.FAILED, str(exc))
@@ -342,8 +341,7 @@ async def handle_addon_deleted(addon, logger, **kwargs):
             ekapi = await ek_client.api_preferred_version("cluster.x-k8s.io")
             resource = await ekapi.resource("clusters")
             cluster = await resource.fetch(
-                addon.spec.cluster_name,
-                namespace = addon.metadata.namespace
+                addon.spec.cluster_name, namespace=addon.metadata.namespace
             )
         except ApiError as exc:
             # If the cluster does not exist, we are done
@@ -358,7 +356,7 @@ async def handle_addon_deleted(addon, logger, **kwargs):
         try:
             secret = await k8s.Secret(ek_client).fetch(
                 f"{cluster.metadata.name}-kubeconfig",
-                namespace = cluster.metadata.namespace
+                namespace=cluster.metadata.namespace,
             )
         except ApiError as exc:
             # If the cluster does not exist, we are done
@@ -375,7 +373,9 @@ async def handle_addon_deleted(addon, logger, **kwargs):
                 await addon.uninstall(ek_client, ek_client_target, helm_client)
             except ApiError as exc:
                 if exc.status_code == 409:
-                    raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+                    raise kopf.TemporaryError(
+                        str(exc), delay=settings.temporary_error_delay
+                    )
                 else:
                     raise
             except helm_errors.ReleaseNotFoundError:
@@ -383,7 +383,9 @@ async def handle_addon_deleted(addon, logger, **kwargs):
                 return
             except helm_errors.ConnectionError as exc:
                 # Assume connection errors are temporary
-                raise kopf.TemporaryError(str(exc), delay = settings.temporary_error_delay)
+                raise kopf.TemporaryError(
+                    str(exc), delay=settings.temporary_error_delay
+                )
 
 
 def compute_checksum(data):
@@ -394,7 +396,9 @@ def compute_checksum(data):
     return hashlib.sha256(data_str).hexdigest()
 
 
-async def handle_config_event(ek_client, type, name, namespace, body, annotation_prefix):
+async def handle_config_event(
+    ek_client, type, name, namespace, body, annotation_prefix
+):
     """
     Handles an event for a watched configmap or secret by updating annotations
     using the specified prefix.
@@ -408,14 +412,13 @@ async def handle_config_event(ek_client, type, name, namespace, body, annotation
         data = body.get("data", {})
         data_str = ";".join(sorted(f"{k}={v}" for k, v in data.items())).encode()
         annotation_value = hashlib.sha256(data_str).hexdigest()
-    # Update any addons that depend on the config
+    # Update any addons that depend on the config
     for crd in registry:
         preferred_version = next(k for k, v in crd.versions.items() if v.storage)
         ekapi = ek_client.api(f"{crd.api_group}/{preferred_version}")
         resource = await ekapi.resource(crd.plural_name)
         async for addon_obj in resource.list(
-            labels = {f"{name}.{annotation_prefix}/uses": PRESENT},
-            namespace = namespace
+            labels={f"{name}.{annotation_prefix}/uses": PRESENT}, namespace=namespace
         ):
             addon = registry.get_model_instance(addon_obj)
             annotation = f"{annotation_prefix}/{name}"
@@ -427,7 +430,7 @@ async def handle_config_event(ek_client, type, name, namespace, body, annotation
                 _ = await resource.patch(
                     addon.metadata.name,
                     {"metadata": {"annotations": {annotation: annotation_value}}},
-                    namespace = addon.metadata.namespace
+                    namespace=addon.metadata.namespace,
                 )
             except ApiError as exc:
                 # If the addon got deleted, that is fine
@@ -435,33 +438,23 @@ async def handle_config_event(ek_client, type, name, namespace, body, annotation
                     raise
 
 
-@kopf.on.event("configmap", labels = { settings.watch_label: kopf.PRESENT })
+@kopf.on.event("configmap", labels={settings.watch_label: kopf.PRESENT})
 async def handle_configmap_event(type, name, namespace, body, **kwargs):
     """
     Executes every time a watched configmap is changed.
     """
     async with create_ek_client() as ek_client:
         await handle_config_event(
-            ek_client,
-            type,
-            name,
-            namespace,
-            body,
-            settings.configmap_annotation_prefix
+            ek_client, type, name, namespace, body, settings.configmap_annotation_prefix
         )
 
 
-@kopf.on.event("secret", labels = { settings.watch_label: kopf.PRESENT })
+@kopf.on.event("secret", labels={settings.watch_label: kopf.PRESENT})
 async def handle_secret_event(type, name, namespace, body, **kwargs):
     """
     Executes every time a watched secret is changed.
     """
     async with create_ek_client() as ek_client:
         await handle_config_event(
-            ek_client,
-            type,
-            name,
-            namespace,
-            body,
-            settings.secret_annotation_prefix
+            ek_client, type, name, namespace, body, settings.secret_annotation_prefix
         )
