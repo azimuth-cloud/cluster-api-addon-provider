@@ -7,32 +7,37 @@ import logging
 import sys
 import tempfile
 
-from easykube import Configuration, ApiError, resources as k8s, PRESENT
 import kopf
+
+from easykube import Configuration, ApiError, resources as k8s, PRESENT
+
 from kube_custom_resource import CustomResourceRegistry
-from pydantic.json import pydantic_encoder
+
 from pyhelm3 import Client as HelmClient
 from pyhelm3 import errors as helm_errors
 
-from capi_addons import models, template, utils
-from capi_addons.models import v1alpha1 as api
-from capi_addons.config import settings
+from . import models, template, utils
+from .models import v1alpha1 as api
+from .config import settings
 
 
 logger = logging.getLogger(__name__)
 
+
 # Initialise the template loader
 template_loader = template.Loader()
 
+
 # Initialise an easykube config object from the environment
-ek_config: Configuration
+from pydantic.json import pydantic_encoder
+
+ek_config = Configuration.from_environment(json_encoder=pydantic_encoder)
 
 
 def create_ek_client():
     """
     Returns an easykube client for the default config.
     """
-    global ek_config
     return ek_config.async_client(default_field_manager=settings.easykube_field_manager)
 
 
@@ -46,8 +51,6 @@ async def apply_settings(**kwargs):
     """
     Apply kopf settings and register CRDs.
     """
-    global ek_config
-    ek_config = Configuration.from_environment(json_encoder=pydantic_encoder)
     kopf_settings = kwargs["settings"]
     kopf_settings.persistence.finalizer = f"{settings.annotation_prefix}/finalizer"
     kopf_settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(
