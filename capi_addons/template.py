@@ -15,27 +15,23 @@ class Loader:
     """
     Class for returning objects created by rendering YAML templates from this package.
     """
+
     def __init__(self, **globals):
         # We only need to render strings and want to shut templates in a sandbox
         # So we use the base loader which doesn't have an implementation for including templates
-        self._env = jinja2.Environment(loader = jinja2.BaseLoader(), autoescape = False)
+        self._env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=False)
         self._env.globals.update(globals)
         self._env.filters.update(
-            mergeconcat = utils.mergeconcat,
-            fromyaml = yaml.safe_load,
+            mergeconcat=utils.mergeconcat,
+            fromyaml=yaml.safe_load,
             # In order to benefit from correct serialisation of a variety of objects,
             # including Pydantic models, generic iterables and generic mappings, we go
-            # via JSON with the Pydantic encoder
-            toyaml = lambda obj: yaml.safe_dump(
-                json.loads(
-                    json.dumps(
-                        obj,
-                        default = pydantic_encoder
-                    )
-                )
+            # via JSON with the Pydantic encoder
+            toyaml=lambda obj: yaml.safe_dump(
+                json.loads(json.dumps(obj, default=pydantic_encoder))
             ),
-            b64encode = lambda data: base64.b64encode(data).decode(),
-            b64decode = lambda data: base64.b64decode(data).decode()
+            b64encode=lambda data: base64.b64encode(data).decode(),
+            b64decode=lambda data: base64.b64decode(data).decode(),
         )
 
     def render_string(self, template_str: str, **params: t.Any) -> str:
