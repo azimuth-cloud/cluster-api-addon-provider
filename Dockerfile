@@ -1,4 +1,4 @@
-FROM ubuntu:jammy as helm
+FROM ubuntu:24.04 as helm
 
 RUN apt-get update && \
     apt-get install -y curl && \
@@ -17,7 +17,7 @@ RUN set -ex; \
     helm version
 
 
-FROM ubuntu:jammy AS python-builder
+FROM ubuntu:24.04 AS python-builder
 
 RUN apt-get update && \
     apt-get install -y python3 python3-venv && \
@@ -33,13 +33,13 @@ COPY . /app
 RUN /venv/bin/pip install /app
 
 
-FROM ubuntu:jammy
+FROM ubuntu:24.04
 
 # Create the user that will be used to run the app
-ENV APP_UID 1001
-ENV APP_GID 1001
-ENV APP_USER app
-ENV APP_GROUP app
+ENV APP_UID=1001
+ENV APP_GID=1001
+ENV APP_USER=app
+ENV APP_GROUP=app
 RUN groupadd --gid $APP_GID $APP_GROUP && \
     useradd \
       --no-create-home \
@@ -54,20 +54,19 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Don't buffer stdout and stderr as it breaks realtime logging
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONUNBUFFERED=1
 
 # Make httpx use the system trust roots
 # By default, this means we use the CAs from the ca-certificates package
-ENV SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 # Tell Helm to use /tmp for mutable data
-ENV HELM_CACHE_HOME /tmp/helm/cache
-ENV HELM_CONFIG_HOME /tmp/helm/config
-ENV HELM_DATA_HOME /tmp/helm/data
+ENV HELM_CACHE_HOME=/tmp/helm/cache
+ENV HELM_CONFIG_HOME=/tmp/helm/config
+ENV HELM_DATA_HOME=/tmp/helm/data
 
 COPY --from=helm /usr/bin/helm /usr/bin/helm
 COPY --from=python-builder /venv /venv
 
 USER $APP_UID
-ENTRYPOINT ["tini", "-g", "--"]
-CMD ["/venv/bin/kopf", "run", "--module", "capi_addons.operator", "--all-namespaces"]
+CMD ["/venv/bin/kopf", "run", "--module", "capi_addons.operator", "--all-namespaces", "--verbose"]
