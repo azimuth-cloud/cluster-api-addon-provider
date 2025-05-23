@@ -22,7 +22,7 @@ kube-custom-resource==0.6.1
 MarkupSafe==3.0.2
 multidict==6.4.4
 propcache==0.3.1
-pydantic==2.11.4
+pydantic==2.11.5
 pyhelm3==0.4.0
 python-json-logger==3.3.0
 PyYAML==6.0.2
