@@ -1,4 +1,4 @@
-FROM ubuntu:24.04 as helm
+FROM ubuntu:24.04 AS helm
 
 RUN apt-get update && \
     apt-get install -y curl && \
