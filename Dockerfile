@@ -50,7 +50,7 @@ RUN groupadd --gid $APP_GID $APP_GROUP && \
       $APP_USER
 
 RUN apt-get update && \
-    apt-get install -y ca-certificates python3 tini && \
+    apt-get install -y ca-certificates python3 && \
     rm -rf /var/lib/apt/lists/*
 
 # Don't buffer stdout and stderr as it breaks realtime logging
