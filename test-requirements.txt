@@ -1,5 +1,3 @@
-hacking>=6.1.0,<7.1 # Apache-2.0
-
 ruff~=0.11.9
 coverage>=4.0,!=4.4 # Apache-2.0
 stestr>=4.2.0 # Apache-2.0
@@ -7,3 +5,4 @@ codespell
 types-PyYAML
 types-setuptools
 mypy
+black~=25.1.0

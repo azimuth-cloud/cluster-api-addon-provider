@@ -1,28 +1,26 @@
 import contextlib
-from datetime import datetime, timezone
 import hashlib
 import pathlib
 import re
 import tempfile
 import typing
+from datetime import UTC, datetime
 
 import yaml
-
-from pydantic import Field
-
 from easykube import ApiError
 from easykube.kubernetes.client import AsyncClient
 from kube_custom_resource import CustomResource, schema
+from pydantic import Field
 from pyhelm3 import (
-    Client,
     Chart,
+    Client,
+    ReleaseNotFoundError,
     ReleaseRevision,
     ReleaseRevisionStatus,
-    ReleaseNotFoundError,
 )
 
-from ...config import settings
-from ...template import Loader
+from capi_addons.config import settings
+from capi_addons.template import Loader
 
 
 class LifecycleHookAction(str, schema.Enum):
@@ -141,7 +139,7 @@ class LifecycleHook(schema.BaseModel):
                         "metadata": {
                             "annotations": {
                                 settings.lifecycle_hook_restart_annotation: (
-                                    datetime.now(tz=timezone.utc)
+                                    datetime.now(tz=UTC)
                                 ),
                             },
                         },
@@ -184,18 +182,18 @@ class LifecycleHooks(schema.BaseModel):
     Model for defining lifecycle hooks.
     """
 
-    pre_upgrade: typing.List[LifecycleHook] = Field(
+    pre_upgrade: list[LifecycleHook] = Field(
         default_factory=list,
         description="Hooks to be run before the addon is installed or upgraded.",
     )
-    post_upgrade: typing.List[LifecycleHook] = Field(
+    post_upgrade: list[LifecycleHook] = Field(
         default_factory=list,
         description="Hooks to be run after the addon is installed or upgraded.",
     )
-    pre_delete: typing.List[LifecycleHook] = Field(
+    pre_delete: list[LifecycleHook] = Field(
         default_factory=list, description="Hooks to be run before the addon is deleted."
     )
-    post_delete: typing.List[LifecycleHook] = Field(
+    post_delete: list[LifecycleHook] = Field(
         default_factory=list, description="Hooks to be run after the addon is deleted."
     )
 
@@ -237,9 +235,10 @@ class AddonSpec(schema.BaseModel):
         False,
         description=(
             "Indicates if reconciliation of the addon is paused. "
-            "When reconciliation of an addon is paused, changes made to the addon are not acted "
-            "on by the operator. This includes deleting an addon, in which case the resources "
-            "deployed for the addon WILL NOT be removed from the target cluster."
+            "When reconciliation of an addon is paused, changes made to the addon are "
+            "not acted on by the operator. This includes deleting an addon, in which "
+            "case the resources deployed for the addon WILL NOT be removed from "
+            "the target cluster."
         ),
     )
 
@@ -293,7 +292,7 @@ class AddonStatus(schema.BaseModel, extra="allow"):
         AddonPhase.UNKNOWN.value, description="The phase of the addon."
     )
     revision: int = Field(0, description="The current revision of the addon.")
-    resources: typing.List[AddonResource] = Field(
+    resources: list[AddonResource] = Field(
         default_factory=list,
         description="The resources that were produced for the current revision.",
     )
@@ -334,15 +333,16 @@ class Addon(CustomResource, abstract=True):
     async def init_metadata(
         self,
         ek_client: AsyncClient,
-        cluster: typing.Dict[str, typing.Any],
-        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]],
+        cluster: dict[str, typing.Any],
+        cloud_identity: dict[str, typing.Any] | None,
     ):
         previous_labels = dict(self.metadata.labels)
         # Make sure that the cluster owns the addon
         owner_references_updated = self.metadata.add_owner_reference(
             cluster, block_owner_deletion=True
         )
-        # Add labels that allow us to filter by cluster, release namespace and release name
+        # Add labels that allow us to filter by cluster, release namespace and
+        # release name
         release_name = self.spec.release_name or self.metadata.name
         self.metadata.labels.update(
             {
@@ -351,8 +351,8 @@ class Addon(CustomResource, abstract=True):
                 settings.release_name_label: release_name,
             }
         )
-        # If the cloud identity is a configmap or secret in the same namespace, add a label
-        # that allows us to filter for it later
+        # If the cloud identity is a configmap or secret in the same namespace,
+        # add a label that allows us to filter for it later
         if (
             cloud_identity["apiVersion"] == "v1"
             and cloud_identity["kind"] in {"ConfigMap", "Secret"}
@@ -368,7 +368,8 @@ class Addon(CustomResource, abstract=True):
                 f"{cloud_identity_name}.{cloud_identity_label_prefix}/uses"
             )
             self.metadata.labels[cloud_identity_label] = ""
-        # Add labels that allow us to filter by the configmaps and secrets that we reference
+        # Add labels that allow us to filter by the configmaps and secrets that
+        # we reference
         self.metadata.labels.update(
             {
                 f"{name}.{settings.configmap_annotation_prefix}/uses": ""
@@ -417,13 +418,13 @@ class Addon(CustomResource, abstract=True):
         # Reset the message unless the phase is failed
         self.status.failure_message = message if phase == AddonPhase.FAILED else ""
 
-    def list_configmaps(self) -> typing.List[str]:
+    def list_configmaps(self) -> list[str]:
         """
         Returns a list of configmaps consumed by this addon.
         """
         raise NotImplementedError
 
-    def list_secrets(self) -> typing.List[str]:
+    def list_secrets(self) -> list[str]:
         """
         Returns a list of secrets consumed by this addon.
         """
@@ -439,11 +440,11 @@ class Addon(CustomResource, abstract=True):
         # Helm client (for the target cluster, but not relevant for chart pulling)
         helm_client: Client,
         # The Cluster API cluster object
-        cluster: typing.Dict[str, typing.Any],
+        cluster: dict[str, typing.Any],
         # The Cluster API infrastructure cluster object
-        infra_cluster: typing.Dict[str, typing.Any],
+        infra_cluster: dict[str, typing.Any],
         # The cloud identity object, if one exists
-        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]],
+        cloud_identity: dict[str, typing.Any] | None,
     ) -> typing.AsyncIterator[Chart]:
         """
         Context manager that yields the chart for this addon.
@@ -457,12 +458,12 @@ class Addon(CustomResource, abstract=True):
         # easykube client for the management cluster
         ek_client: AsyncClient,
         # The Cluster API cluster object
-        cluster: typing.Dict[str, typing.Any],
+        cluster: dict[str, typing.Any],
         # The Cluster API infrastructure cluster object
-        infra_cluster: typing.Dict[str, typing.Any],
+        infra_cluster: dict[str, typing.Any],
         # The cloud identity object, if one exists
-        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]],
-    ) -> typing.Dict[str, typing.Any]:
+        cloud_identity: dict[str, typing.Any] | None,
+    ) -> dict[str, typing.Any]:
         """
         Returns the values to use with the release.
         """
@@ -487,10 +488,11 @@ class Addon(CustomResource, abstract=True):
             return None
         else:
             if current_revision.status in {
-                # If the release is stuck in pending-install, there is nothing to rollback to
-                # Instead, we have to uninstall the release and try again
+                # If the release is stuck in pending-install, there is nothing
+                # to rollback to Instead, we have to uninstall the release and try again
                 ReleaseRevisionStatus.PENDING_INSTALL,
-                # If the release is stuck in uninstalling, we need to complete the uninstall
+                # If the release is stuck in uninstalling, we need to complete
+                # the uninstall
                 ReleaseRevisionStatus.UNINSTALLING,
             }:
                 self.set_phase(AddonPhase.PREPARING)
@@ -500,10 +502,11 @@ class Addon(CustomResource, abstract=True):
                 )
                 return None
             elif current_revision.status in {
-                # If the release is stuck in pending-upgrade, we need to rollback to the previous
-                # revision before trying the upgrade again
+                # If the release is stuck in pending-upgrade, we need to rollback to
+                # the previous revision before trying the upgrade again
                 ReleaseRevisionStatus.PENDING_UPGRADE,
-                # For a release stuck in pending-rollback, we need to complete the rollback
+                # For a release stuck in pending-rollback, we need to complete the
+                # rollback
                 ReleaseRevisionStatus.PENDING_ROLLBACK,
             }:
                 self.set_phase(AddonPhase.PREPARING)
@@ -517,9 +520,9 @@ class Addon(CustomResource, abstract=True):
 
     async def _should_install_or_upgrade(
         self,
-        current_revision: typing.Optional[ReleaseRevision],
+        current_revision: ReleaseRevision | None,
         chart: Chart,
-        values: typing.Dict[str, typing.Any],
+        values: dict[str, typing.Any],
     ):
         """
         Returns True if an install or upgrade is required based on the given revision,
@@ -556,22 +559,24 @@ class Addon(CustomResource, abstract=True):
         # Helm client for the target cluster
         helm_client: Client,
         # The Cluster API cluster object
-        cluster: typing.Dict[str, typing.Any],
+        cluster: dict[str, typing.Any],
         # The Cluster API infrastructure cluster object
-        infra_cluster: typing.Dict[str, typing.Any],
+        infra_cluster: dict[str, typing.Any],
         # The cloud identity object, if one exists
-        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]],
+        cloud_identity: dict[str, typing.Any] | None,
     ):
         """
         Install or upgrade this addon on the target cluster.
         """
         # Before making a new revision, check the current status
         # If a release was interrupted, e.g. by a connection failure or the controller
-        # pod being terminated, the release may be in a pending state that we need to correct
+        # pod being terminated, the release may be in a pending state that we
+        # need to correct
         current_revision = await self._get_current_revision(
             ek_client_management, helm_client
         )
-        # Now we know that the release is proceedable, we can fetch or assemble the chart
+        # Now we know that the release is proceedable, we can fetch or assemble
+        # the chart
         chart_context = self.get_chart(
             template_loader,
             ek_client_management,
@@ -607,7 +612,8 @@ class Addon(CustomResource, abstract=True):
                     values,
                     cleanup_on_fail=True,
                     namespace=self.spec.target_namespace,
-                    # Always reset to the values from the chart then apply our changes on top
+                    # Always reset to the values from the chart then apply
+                    # our changes on top
                     reset_values=True,
                     timeout=self.spec.release_timeout,
                     wait=True,
@@ -675,10 +681,10 @@ class EphemeralChartAddon(Addon, abstract=True):
         self,
         template_loader: Loader,
         ek_client: AsyncClient,
-        cluster: typing.Dict[str, typing.Any],
-        infra_cluster: typing.Dict[str, typing.Any],
-        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]],
-    ) -> typing.Iterable[typing.Dict[str, typing.Any]]:
+        cluster: dict[str, typing.Any],
+        infra_cluster: dict[str, typing.Any],
+        cloud_identity: dict[str, typing.Any] | None,
+    ) -> typing.Iterable[dict[str, typing.Any]]:
         """
         Returns the resources to use to build the ephemeral chart.
         """
@@ -690,9 +696,9 @@ class EphemeralChartAddon(Addon, abstract=True):
         template_loader: Loader,
         ek_client: AsyncClient,
         helm_client: Client,
-        cluster: typing.Dict[str, typing.Any],
-        infra_cluster: typing.Dict[str, typing.Any],
-        cloud_identity: typing.Optional[typing.Dict[str, typing.Any]],
+        cluster: dict[str, typing.Any],
+        infra_cluster: dict[str, typing.Any],
+        cloud_identity: dict[str, typing.Any] | None,
     ) -> contextlib.AbstractAsyncContextManager[Chart]:
         # Write the files for the ephemeral chart
         with tempfile.TemporaryDirectory() as chart_directory:
@@ -724,7 +730,8 @@ class EphemeralChartAddon(Addon, abstract=True):
                 # Update the hash with the content of the file
                 hasher.update(content.encode())
                 # Escape any go template syntax in the resulting document
-                # Note that we only need to escape the starting delimiters as ending delimiters
+                # Note that we only need to escape the starting delimiters as ending
+                # delimiters
                 # are ignored without the corresponding start delimiter
                 content = re.sub(r"\{\{\-?", '{{ "\g<0>" }}', content)
                 with path.open("w") as fh:

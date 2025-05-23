@@ -1,15 +1,12 @@
 import base64
 import typing as t
 
+from easykube.kubernetes.client import AsyncClient
+from kube_custom_resource import schema
 from pydantic import Field
 
-from easykube.kubernetes.client import AsyncClient
-
-from kube_custom_resource import schema
-
-from ...template import Loader
-from .base import EphemeralChartAddon, AddonSpec
-
+from capi_addons.models.v1alpha1.base import AddonSpec, EphemeralChartAddon
+from capi_addons.template import Loader
 
 # Type variable for forward references to the HelmRelease type
 ManifestsType = t.TypeVar("ManifestsType", bound="Manifests")
@@ -24,19 +21,19 @@ class ManifestSourceNameKeys(schema.BaseModel):
     name: schema.constr(pattern=r"^[a-z0-9-]+$") = Field(
         ..., description="The name of the resource to use."
     )
-    keys: t.List[schema.constr(min_length=1)] = Field(
+    keys: list[schema.constr(min_length=1)] = Field(
         default_factory=list,
         description=(
             "The keys in the resource to render as manifests. "
             "If not given, all the keys are considered."
         ),
     )
-    exclude_keys: t.List[schema.constr(min_length=1)] = Field(
+    exclude_keys: list[schema.constr(min_length=1)] = Field(
         default_factory=list,
         description="Keys to explicitly exclude from being rendered as manifests.",
     )
 
-    def filter_keys(self, keys: t.List[str]) -> t.List[str]:
+    def filter_keys(self, keys: list[str]) -> list[str]:
         """
         Given a list of keys, return the keys that match the configured filters.
         """
@@ -47,10 +44,10 @@ class ManifestSourceNameKeys(schema.BaseModel):
 
 class ManifestConfigMapSource(schema.BaseModel):
     """
-    Model for a manifest source that renders the keys in a configmap as Jinja2 templates.
+    Model for a manifest source that renders the keys in a configmap as Jinja2 templates
 
-    The templates are provided with the HelmRelease object, the Cluster API Cluster resource
-    and the infrastructure cluster resource as template variables.
+    The templates are provided with the HelmRelease object, the Cluster API Cluster
+    resource and the infrastructure cluster resource as template variables.
     """
 
     config_map: ManifestSourceNameKeys = Field(
@@ -62,10 +59,10 @@ class ManifestConfigMapSource(schema.BaseModel):
         template_loader: Loader,
         ek_client: AsyncClient,
         addon: ManifestsType,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
-    ) -> t.Iterable[t.Dict[str, t.Any]]:
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
+    ) -> t.Iterable[dict[str, t.Any]]:
         resource = await ek_client.api("v1").resource("configmaps")
         configmap = await resource.fetch(
             self.config_map.name, namespace=addon.metadata.namespace
@@ -87,8 +84,8 @@ class ManifestSecretSource(schema.BaseModel):
     """
     Model for a manifest source that renders the keys in a secret as Jinja2 templates.
 
-    The templates are provided with the HelmRelease object, the Cluster API Cluster resource
-    and the infrastructure cluster resource as template variables.
+    The templates are provided with the HelmRelease object, the Cluster API Cluster
+    resource and the infrastructure cluster resource as template variables.
     """
 
     secret: ManifestSourceNameKeys = Field(
@@ -100,10 +97,10 @@ class ManifestSecretSource(schema.BaseModel):
         template_loader: Loader,
         ek_client: AsyncClient,
         addon: ManifestsType,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
-    ) -> t.Iterable[t.Dict[str, t.Any]]:
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
+    ) -> t.Iterable[dict[str, t.Any]]:
         resource = await ek_client.api("v1").resource("secrets")
         secret = await resource.fetch(
             self.secret.name, namespace=addon.metadata.namespace
@@ -138,10 +135,10 @@ class ManifestTemplateSource(schema.BaseModel):
         template_loader: Loader,
         ek_client: AsyncClient,
         addon: ManifestsType,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
-    ) -> t.Iterable[t.Dict[str, t.Any]]:
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
+    ) -> t.Iterable[dict[str, t.Any]]:
         return (
             resource
             for resource in template_loader.yaml_string_all(
@@ -155,11 +152,7 @@ class ManifestTemplateSource(schema.BaseModel):
 
 
 ManifestSource = t.Annotated[
-    t.Union[
-        ManifestConfigMapSource,
-        ManifestSecretSource,
-        ManifestTemplateSource,
-    ],
+    ManifestConfigMapSource | ManifestSecretSource | ManifestTemplateSource,
     schema.StructuralUnion,
 ]
 ManifestSource.__doc__ = "Union type for the possible manifest sources."
@@ -170,7 +163,7 @@ class ManifestsSpec(AddonSpec):
     Specification for a set of manifests to be deployed onto the target cluster.
     """
 
-    manifest_sources: t.List[ManifestSource] = Field(
+    manifest_sources: list[ManifestSource] = Field(
         default_factory=list, description="The manifest sources for the release."
     )
 
@@ -236,10 +229,10 @@ class Manifests(
         self,
         template_loader: Loader,
         ek_client: AsyncClient,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
-    ) -> t.AsyncIterable[t.Dict[str, t.Any]]:
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
+    ) -> t.AsyncIterable[dict[str, t.Any]]:
         """
         Returns the resources to use to build the ephemeral chart.
         """

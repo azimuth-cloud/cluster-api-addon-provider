@@ -3,18 +3,15 @@ import contextlib
 import pathlib
 import typing as t
 
-from pydantic import Field
-
 from easykube.kubernetes.client import AsyncClient
-
 from kube_custom_resource import schema
-
+from pydantic import Field
 from pyhelm3 import Client
 
-from ...template import Loader
-from ...utils import mergeconcat
-from .base import Addon, AddonSpec
+from capi_addons.template import Loader
+from capi_addons.utils import mergeconcat
 
+from .base import Addon, AddonSpec
 
 # Type variable for forward references to the HelmRelease type
 HelmReleaseType = t.TypeVar("HelmReleaseType", bound="HelmRelease")
@@ -74,10 +71,10 @@ class HelmValuesConfigMapSource(schema.BaseModel):
         template_loader: Loader,
         ek_client: AsyncClient,
         addon: HelmReleaseType,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
-    ) -> t.Dict[str, t.Any]:
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
+    ) -> dict[str, t.Any]:
         resource = await ek_client.api("v1").resource("configmaps")
         configmap = await resource.fetch(
             self.config_map.name, namespace=addon.metadata.namespace
@@ -109,10 +106,10 @@ class HelmValuesSecretSource(schema.BaseModel):
         template_loader: Loader,
         ek_client: AsyncClient,
         addon: HelmReleaseType,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
-    ) -> t.Dict[str, t.Any]:
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
+    ) -> dict[str, t.Any]:
         resource = await ek_client.api("v1").resource("secrets")
         secret = await resource.fetch(
             self.secret.name, namespace=addon.metadata.namespace
@@ -144,10 +141,10 @@ class HelmValuesTemplateSource(schema.BaseModel):
         template_loader: Loader,
         ek_client: AsyncClient,
         addon: HelmReleaseType,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
-    ) -> t.Dict[str, t.Any]:
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
+    ) -> dict[str, t.Any]:
         return template_loader.yaml_string(
             self.template,
             addon=addon,
@@ -158,11 +155,7 @@ class HelmValuesTemplateSource(schema.BaseModel):
 
 
 HelmValuesSource = t.Annotated[
-    t.Union[
-        HelmValuesConfigMapSource,
-        HelmValuesSecretSource,
-        HelmValuesTemplateSource,
-    ],
+    HelmValuesConfigMapSource | HelmValuesSecretSource | HelmValuesTemplateSource,
     schema.StructuralUnion,
 ]
 HelmValuesSource.__doc__ = "Union type for the possible values sources."
@@ -174,7 +167,7 @@ class HelmReleaseSpec(AddonSpec):
     """
 
     chart: HelmChart = Field(..., description="The chart specification.")
-    values_sources: t.List[HelmValuesSource] = Field(
+    values_sources: list[HelmValuesSource] = Field(
         default_factory=list, description="The values sources for the release."
     )
 
@@ -252,9 +245,9 @@ class HelmRelease(
         template_loader: Loader,
         ek_client: AsyncClient,
         helm_client: Client,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
     ) -> contextlib.AbstractAsyncContextManager[pathlib.Path]:
         return helm_client.pull_chart(
             self.spec.chart.name,
@@ -266,10 +259,10 @@ class HelmRelease(
         self,
         template_loader: Loader,
         ek_client: AsyncClient,
-        cluster: t.Dict[str, t.Any],
-        infra_cluster: t.Dict[str, t.Any],
-        cloud_identity: t.Optional[t.Dict[str, t.Any]],
-    ) -> t.Dict[str, t.Any]:
+        cluster: dict[str, t.Any],
+        infra_cluster: dict[str, t.Any],
+        cloud_identity: dict[str, t.Any] | None,
+    ) -> dict[str, t.Any]:
         # Compose the values from the specified sources
         values = {}
         for source in self.spec.values_sources:

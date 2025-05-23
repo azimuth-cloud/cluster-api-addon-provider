@@ -1,12 +1,11 @@
-import typing as t
-
-from pydantic import Field, conint, constr, field_validator, ValidationInfo
-
 from configomatic import (
     Configuration as BaseConfiguration,
-    Section,
-    LoggingConfiguration,
 )
+from configomatic import (
+    LoggingConfiguration,
+    Section,
+)
+from pydantic import Field, ValidationInfo, conint, constr, field_validator
 
 
 class HelmClientConfiguration(Section):
@@ -16,7 +15,7 @@ class HelmClientConfiguration(Section):
 
     #: The default timeout to use with Helm releases
     #: Can be an integer number of seconds or a duration string like 5m, 5h
-    default_timeout: t.Union[int, constr(min_length=1)] = "1h"
+    default_timeout: int | constr(min_length=1) = "1h"
     #: The executable to use
     #: By default, we assume Helm is on the PATH
     executable: constr(min_length=1) = "helm"
@@ -26,7 +25,7 @@ class HelmClientConfiguration(Section):
     insecure_skip_tls_verify: bool = False
     #: The directory to use for unpacking charts
     #: By default, the system temporary directory is used
-    unpack_directory: t.Optional[str] = None
+    unpack_directory: str | None = None
 
 
 class Configuration(
@@ -47,7 +46,7 @@ class Configuration(
     #: The prefix to use for operator annotations
     annotation_prefix: constr(min_length=1) = Field(None, validate_default=True)
     #: A list of categories to place CRDs into
-    crd_categories: t.List[constr(min_length=1)] = Field(
+    crd_categories: list[constr(min_length=1)] = Field(
         default_factory=lambda: ["cluster-api", "capi-addons"]
     )
 

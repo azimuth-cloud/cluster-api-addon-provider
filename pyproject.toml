@@ -1,28 +1,9 @@
 [tool.ruff]
-# Match Black's style
 line-length = 88
-target-version = "py312"  # adjust to your minimum supported Python version
+target-version = "py312"
 
-# Match Flake8/hacking exclude patterns
-exclude = [
-  ".venv",
-  ".git",
-  ".tox",
-  "dist",
-  "doc",
-  "build",
-  "*egg",
-  "*lib/python*"
-]
-
-# For OpenStack/_-based i18n
-builtins = ["_"]
-
-# Optional: format with Ruff (in place of Black)
 [tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-line-ending = "auto"
+line-ending = "lf"
 
 [tool.ruff.lint]
 select = [
@@ -30,10 +11,22 @@ select = [
     "E",
     # Pyflakes
     "F",
+    # flake8-builtins
+    "A",
+    # Ruff rules
+    "RUF",
     # flake8-async
     "ASYNC",
     # pyupgrade
     "UP",
+    # tidy imports
+    "TID",
+    # sorted imports
+    "I",
+    # check complexity
+    "C90",
+    # pep8 naming
+    "N",
 ]
 
 [tool.mypy]
@@ -41,3 +34,7 @@ follow_imports = "silent"
 warn_redundant_casts = true
 warn_unused_ignores = true
 check_untyped_defs = true
+
+[tool.ruff.lint.mccabe]
+# Flag errors (`C901`) whenever the complexity level exceeds 5.
+max-complexity = 15

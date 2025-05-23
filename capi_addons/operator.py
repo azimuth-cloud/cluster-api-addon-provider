@@ -7,17 +7,17 @@ import logging
 import sys
 import tempfile
 
-from easykube import Configuration, ApiError, resources as k8s, PRESENT
 import kopf
+from easykube import PRESENT, ApiError, Configuration
+from easykube import resources as k8s
 from kube_custom_resource import CustomResourceRegistry
 from pydantic.json import pydantic_encoder
 from pyhelm3 import Client as HelmClient
 from pyhelm3 import errors as helm_errors
 
 from capi_addons import models, template, utils
-from capi_addons.models import v1alpha1 as api
 from capi_addons.config import settings
-
+from capi_addons.models import v1alpha1 as api
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,8 @@ async def apply_settings(**kwargs):
         # Give Kubernetes a chance to create the APIs for the CRDs
         await asyncio.sleep(0.5)
         # Check to see if the APIs for the CRDs are up
-        # If they are not, the kopf watches will not start properly so we exit and get restarted
+        # If they are not, the kopf watches will not start properly so we exit and get
+        # restarted
         for crd in registry:
             preferred_version = next(k for k, v in crd.versions.items() if v.storage)
             api_version = f"{crd.api_group}/{preferred_version}"
@@ -157,7 +158,8 @@ async def until_deleted(addon):
     """
     Runs until the given addon is deleted.
 
-    Used as a circuit-breaker to stop an in-progress install/upgrade when an addon is deleted.
+    Used as a circuit-breaker to stop an in-progress install/upgrade when an addon
+    is deleted.
     """
     async with create_ek_client() as ek_client:
         ekapi = ek_client.api(addon.api_version)
@@ -176,26 +178,30 @@ async def until_deleted(addon):
 
 @addon_handler(kopf.on.create)
 # Run when the annotations are updated as well as the spec
-# This means that when we change an annotation in response to a configmap or secret being
-# changed, the upgrade logic will be executed for the new configmap or secret content
+# This means that when we change an annotation in response to a configmap or
+# secret being changed, the upgrade logic will be executed for the new configmap or
+# secret content
 @addon_handler(kopf.on.update, field="metadata.annotations")
 @addon_handler(kopf.on.update, field="spec")
 # Also run on resume - if nothing has changed, no Helm release will be made
 @addon_handler(kopf.on.resume)
 async def handle_addon_updated(addon, logger, **kwargs):
     """
-    Executes whenever an addon is created or the annotations or spec of an addon are updated.
+    Executes whenever an addon is created or the annotations or spec of an addon
+    are updated.
 
     Every type of addon eventually ends up as a Helm release on the target cluster as we
-    want release semantics even if the manifests are not rendered by Helm - in particular
-    we want to identify and remove resources that are no longer part of the addon.
+    want release semantics even if the manifests are not rendered by Helm - in
+    particular we want to identify and remove resources that are no longer part of
+    the addon.
 
     For non-Helm addons, this is done by turning the manifests into an "ephemeral chart"
     which is rendered and then disposed.
     """
     async with create_ek_client() as ek_client:
         try:
-            # Make sure the status has been initialised at the earliest possible opportunity
+            # Make sure the status has been initialised at the earliest
+            # possible opportunity
             await addon.init_status(ek_client)
             # Check that the cluster associated with the addon exists
             ekapi = await ek_client.api_preferred_version("cluster.x-k8s.io")
@@ -208,7 +214,8 @@ async def handle_addon_updated(addon, logger, **kwargs):
                 ek_client, cluster.spec["infrastructureRef"], cluster.metadata.namespace
             )
             # Get the cloud identity for the infra cluster, if it exists
-            # It is made available to templates in case they need to configure access to the cloud
+            # It is made available to templates in case they need to
+            # configure access to the cloud
             id_ref = infra_cluster.spec.get("identityRef")
             if id_ref:
                 cloud_identity = await fetch_ref(
@@ -216,7 +223,8 @@ async def handle_addon_updated(addon, logger, **kwargs):
                 )
             else:
                 cloud_identity = None
-            # Make sure that the cluster owns the addon and the addon has the required labels
+            # Make sure that the cluster owns the addon and the addon has
+            # the required labels
             await addon.init_metadata(ek_client, cluster, cloud_identity)
             # Make sure any referenced configmaps or secrets will be watched
             configmaps = await ek_client.api("v1").resource("configmaps")
@@ -233,7 +241,8 @@ async def handle_addon_updated(addon, logger, **kwargs):
                     {"metadata": {"labels": {settings.watch_label: ""}}},
                     namespace=addon.metadata.namespace,
                 )
-            # If the cloud identity is a secret or configmap in the same namespace, watch it
+            # If the cloud identity is a secret or configmap
+            # in the same namespace, watch it
             if (
                 cloud_identity
                 and cloud_identity["apiVersion"] == "v1"
@@ -257,8 +266,8 @@ async def handle_addon_updated(addon, logger, **kwargs):
                     f"cluster '{addon.spec.cluster_name}' is not ready",
                     delay=settings.temporary_error_delay,
                 )
-            # At this point initialisation has happened and we are in a position to perform an
-            # action, so check if we are paused
+            # At this point initialisation has happened and we are in a position
+            # to perform an action, so check if we are paused
             if addon.spec.paused:
                 logger.warning("no action taken as addon is paused")
                 return
@@ -267,9 +276,11 @@ async def handle_addon_updated(addon, logger, **kwargs):
                 f"{cluster.metadata.name}-kubeconfig",
                 namespace=cluster.metadata.namespace,
             )
-            # Get easykube and Helm clients for the target cluster and use them to deploy the addon
+            # Get easykube and Helm clients for the target cluster and use
+            # them to deploy the addon
             async with clients_for_cluster(secret) as (ek_client_target, helm_client):
-                # If the addon is deleted while an install or upgrade is in progress, cancel it
+                # If the addon is deleted while an install or upgrade
+                # is in progress, cancel it
                 install_upgrade_task = asyncio.create_task(
                     addon.install_or_upgrade(
                         template_loader,
@@ -298,7 +309,8 @@ async def handle_addon_updated(addon, logger, **kwargs):
                     _ = await task
         # Handle expected errors by converting them to kopf errors
         # This suppresses the stack trace in logs/events
-        # Let unexpected errors bubble without suppressing the stack trace so they can be debugged
+        # Let unexpected errors bubble without suppressing the stack trace so they
+        # can be debugged
         except ApiError as exc:
             # 404 and 409 are recoverable
             if exc.status_code in {404, 409}:
@@ -394,7 +406,12 @@ def compute_checksum(data):
 
 
 async def handle_config_event(
-    ek_client, type, name, namespace, body, annotation_prefix
+    ek_client,
+    type,  # noqa: A002
+    name,
+    namespace,
+    body,
+    annotation_prefix,
 ):
     """
     Handles an event for a watched configmap or secret by updating annotations
@@ -436,7 +453,7 @@ async def handle_config_event(
 
 
 @kopf.on.event("configmap", labels={settings.watch_label: kopf.PRESENT})
-async def handle_configmap_event(type, name, namespace, body, **kwargs):
+async def handle_configmap_event(type, name, namespace, body, **kwargs):  # noqa: A002
     """
     Executes every time a watched configmap is changed.
     """
@@ -447,7 +464,7 @@ async def handle_configmap_event(type, name, namespace, body, **kwargs):
 
 
 @kopf.on.event("secret", labels={settings.watch_label: kopf.PRESENT})
-async def handle_secret_event(type, name, namespace, body, **kwargs):
+async def handle_secret_event(type, name, namespace, body, **kwargs):  # noqa: A002
     """
     Executes every time a watched secret is changed.
     """
