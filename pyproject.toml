@@ -28,6 +28,9 @@ select = [
     # pep8 naming
     "N",
 ]
+ignore = [
+    "UP038", # deprecated
+]
 
 [tool.mypy]
 follow_imports = "silent"
