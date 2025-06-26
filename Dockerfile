@@ -1,8 +1,7 @@
 FROM ubuntu:24.04 AS helm
 
 RUN apt-get update && \
-    apt-get install -y curl && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y curl
 
 ARG HELM_VERSION=v3.18.3
 RUN set -ex; \
