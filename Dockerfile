@@ -20,7 +20,7 @@ RUN set -ex; \
 FROM ubuntu:24.04 AS python-builder
 
 RUN apt-get update && \
-    apt-get install -y python3 python3-venv && \
+    apt-get install -y python3 python3-venv git && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /venv && \
