@@ -1,3 +1,9 @@
 __pycache__
 *.egg-info
 .python-version
+chart/charts/*
+chart/Chart.lock
+# ignore unit test stuff
+.stestr/*
+.tox/*
+.coverage*
