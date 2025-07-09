@@ -4,7 +4,7 @@ import pathlib
 import re
 import tempfile
 import typing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import yaml
 from easykube import ApiError
@@ -22,7 +22,7 @@ from pyhelm3 import (
 from capi_addons.config import settings
 from capi_addons.template import Loader
 
-UTC = timezone.utc
+UTC = UTC
 
 
 class LifecycleHookAction(str, schema.Enum):
