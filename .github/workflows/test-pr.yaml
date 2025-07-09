@@ -80,3 +80,5 @@ jobs:
       - name: Destroy Azimuth
         uses: azimuth-cloud/azimuth-config/.github/actions/destroy@devel
         if: ${{ always() }}
+
+# add/remove this line in a separate commit to trigger a previously updated workflow run
