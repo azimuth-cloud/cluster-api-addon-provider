@@ -3,7 +3,7 @@ FROM ubuntu:24.04 AS helm
 RUN apt-get update && \
     apt-get install -y curl wget ca-certificates
 
-ARG HELM_VERSION=v3.18.3
+ARG HELM_VERSION=v3.18.4
 RUN set -ex; \
     OS_ARCH="$(uname -m)"; \
     case "$OS_ARCH" in \
