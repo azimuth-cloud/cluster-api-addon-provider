@@ -146,10 +146,47 @@ async def fetch_ref(ek_client, ref, default_namespace):
     Returns the object that is referred to by a ref.
     """
     # By default, look for a secret unless otherwise specified
-    api_version = ref.get("apiVersion", "v1")
     kind = ref.get("kind", "Secret")
     name = ref["name"]
     namespace = ref.get("namespace", default_namespace)
+
+    # Handle API version detection
+    api_version = ref.get("apiVersion")
+    if not api_version:
+        # If no apiVersion is specified, try to infer it based on the kind
+        if kind in {"Secret", "ConfigMap", "Service", "Pod", "Namespace"}:
+            api_version = "v1"
+        elif kind == "OpenStackCluster":
+            api_version = "infrastructure.cluster.x-k8s.io/v1beta1"
+        elif kind == "OpenStackMachine":
+            api_version = "infrastructure.cluster.x-k8s.io/v1beta1"
+        elif kind == "OpenStackMachineTemplate":
+            api_version = "infrastructure.cluster.x-k8s.io/v1beta1"
+        else:
+            # Try to find the API version using discovery
+            try:
+                if kind in {"Secret", "ConfigMap", "Service", "Pod", "Namespace"}:
+                    api_version = "v1"
+                else:
+                    # Try common infrastructure provider API versions
+                    candidate_versions = ["v1beta1", "v1alpha7", "v1alpha6", "v1alpha5"]
+                    for candidate_version in candidate_versions:
+                        try:
+                            candidate_api = (
+                                f"infrastructure.cluster.x-k8s.io/{candidate_version}"
+                            )
+                            _ = await ek_client.api(candidate_api).resource(
+                                kind.lower() + "s"
+                            )
+                            api_version = candidate_api
+                            break
+                        except Exception:
+                            continue
+                    if not api_version:
+                        api_version = "v1"  # fallback
+            except Exception:
+                api_version = "v1"  # fallback
+
     resource = await ek_client.api(api_version).resource(kind)
     return await resource.fetch(name, namespace=namespace)
 
