@@ -146,11 +146,20 @@ async def fetch_ref(ek_client, ref, default_namespace):
     Returns the object that is referred to by a ref.
     """
     # By default, look for a secret unless otherwise specified
-    api_version = ref.get("apiVersion", "v1")
     kind = ref.get("kind", "Secret")
     name = ref["name"]
     namespace = ref.get("namespace", default_namespace)
-    resource = await ek_client.api(api_version).resource(kind)
+
+    # CAPI v1beta2 resources have apiGroup not apiVersion
+    api_group = ref.get("apiGroup")
+    if api_group is not None:
+        ekapi = await ek_client.api_preferred_version(api_group)
+        resource = await ekapi.resource(kind)
+    else:
+        # The default v1 apiVersion corresponds to a secret
+        api_version = ref.get("apiVersion", "v1")
+        resource = await ek_client.api(api_version).resource(kind)
+
     return await resource.fetch(name, namespace=namespace)
 
 
