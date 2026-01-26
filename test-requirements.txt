@@ -1,8 +1,8 @@
-ruff~=0.14.13
+ruff~=0.14.14
 coverage>=4.0,!=4.4 # Apache-2.0
 stestr>=4.2.0 # Apache-2.0
 codespell
 types-PyYAML
 types-setuptools
 mypy
-black~=25.12.0
+black~=26.1.0
