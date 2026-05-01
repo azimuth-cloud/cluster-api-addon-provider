@@ -70,6 +70,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build_push_chart:
+    permissions:
+      contents: write
+      id-token: none
+      packages: none
+      security-events: none
     name: Build and push Helm chart
     runs-on: ubuntu-latest
     # Only build and push the chart if the images built successfully
