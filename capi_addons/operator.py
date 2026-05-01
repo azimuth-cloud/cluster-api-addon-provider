@@ -268,7 +268,10 @@ async def handle_addon_updated(addon, logger, **kwargs):
             # For bootstrap addons, just wait for the control plane to be initialised
             # For non-bootstrap addons, wait for the cluster to be ready
             ready = utils.check_condition(
-                cluster, "ControlPlaneInitialized" if addon.spec.bootstrap else "Ready"
+                cluster,
+                ["ControlPlaneInitialized"]
+                if addon.spec.bootstrap
+                else ["Ready", "Available"],
             )
             if not ready:
                 raise kopf.TemporaryError(
