@@ -27,12 +27,12 @@ def mergeconcat(defaults, *overrides):
     return functools.reduce(mergeconcat2, overrides, defaults)
 
 
-def check_condition(obj: dict[str, t.Any], name: str) -> bool:
+def check_condition(obj: dict[str, t.Any], names: list) -> bool:
     """
-    Returns True if the specified condition exists and is True for the given object,
-    False otherwise.
+    Returns True if any of the specified conditions exist and are
+    True for the given object, False otherwise.
     """
     return any(
-        condition["type"] == name and condition["status"] == "True"
+        condition["type"] in names and condition["status"] == "True"
         for condition in obj.get("status", {}).get("conditions", [])
     )
