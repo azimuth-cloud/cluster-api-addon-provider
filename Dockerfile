@@ -2,12 +2,12 @@
 # All FROM statements in the dockerfile.
 ARG FINAL_IMAGE_TAG=nonroot
 
-FROM debian:trixie-slim AS helm
+FROM ubuntu:24.04 AS helm
 
 RUN apt-get update && \
     apt-get install -y curl wget ca-certificates
 
-ARG HELM_VERSION=v3.21.2
+ARG HELM_VERSION=v4.2.4
 RUN set -ex; \
     OS_ARCH="$(uname -m)"; \
     case "$OS_ARCH" in \
@@ -77,7 +77,7 @@ RUN --mount=type=cache,target=/uv-cache/ \
 ###########################
 # The final image needs a shell to run helm commands (via pyhelm3 and subprocess)
 # so we cannot use a distroless final image
-FROM debian:trixie-slim AS final
+FROM ubuntu:24.04 AS final
 
 # Create the user that will be used to run the app
 ENV APP_UID=1001
