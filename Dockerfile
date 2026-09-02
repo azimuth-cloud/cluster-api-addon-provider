@@ -1,3 +1,7 @@
+# Build args which are used in FROM statements must come before
+# All FROM statements in the dockerfile.
+ARG FINAL_IMAGE_TAG=nonroot
+
 FROM ubuntu:24.04 AS helm
 
 RUN apt-get update && \
@@ -15,24 +19,66 @@ RUN set -ex; \
       tar -xz --strip-components 1 -C /usr/bin linux-${helm_arch}/helm; \
     helm version
 
+############################
+## INSTALL AND BUILD APP ###
+############################
+FROM astral/uv:trixie AS build
+# Note: distro should match final image stage to ensure build compat. trixie=debian13
+# Non-slim version required for git.
 
-FROM ubuntu:24.04 AS python-builder
+# These env vars setup UV for a docker installation as opposed to
+# the defaults which are optimised for local development.
+# https://docs.astral.sh/uv/guides/integration/docker/#optimizations
+# https://docs.astral.sh/uv/reference/environment/
+ENV UV_NO_DEV=1 \
+    UV_NO_EDITABLE=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_FROZEN=1 \
+    UV_CACHE_DIR=/uv-cache/ \
+    UV_PYTHON_INSTALL_DIR=/python \
+    UV_PYTHON_INSTALL_BIN=0 \
+    UV_PYTHON_PREFERENCE=only-managed
 
-RUN apt-get update && \
-    apt-get install -y python3 python3-venv git && \
-    rm -rf /var/lib/apt/lists/*
+WORKDIR /app-source
 
-RUN python3 -m venv /venv && \
-    /venv/bin/pip install -U pip setuptools
+### INSTALL PINNED PYTHON ###
+# https://docs.astral.sh/uv/guides/install-python/
+COPY .python-version /app-source
+RUN uv python install \
+    && chmod -R ugo=rX /python
 
-COPY requirements.txt /app/requirements.txt
-RUN  /venv/bin/pip install --requirement /app/requirements.txt
+### INSTALL PROJECT INTO VENV ###
+# uv sync --active makes uv (re)create the currently
+# active venv and install into it.
+ENV VIRTUAL_ENV=/app
 
-COPY . /app
-RUN /venv/bin/pip install /app
+### INSTALL PINNED DEPENDENCIES ###
+# --frozen makes uv install the versions which are pinned in uv.lock
+# Installing the dependencies first optimizes caching so if the app
+# changes but not the deps there is no need to rebuild this.
+COPY uv.lock pyproject.toml README.md /app-source
+RUN --mount=type=cache,target=/uv-cache/ \
+    uv sync --active \
+            --frozen \
+            --no-install-project \
+    && chmod -R ugo=rX /app
 
+### INSTALL THE PROJECT ###
+# Then install the app.
+COPY ./capi_addons ./capi_addons
+RUN --mount=type=cache,target=/uv-cache/ \
+    uv sync --active \
+            --frozen \
+    && chmod -R ugo=rX /app
+RUN uv pip install .
 
-FROM ubuntu:24.04
+RUN ls /app/lib/python3.12/site-packages
+
+###########################
+### COMPILE FINAL IMAGE ###
+###########################
+FROM ubuntu:24.04 AS final
 
 # Create the user that will be used to run the app
 ENV APP_UID=1001
@@ -48,24 +94,19 @@ RUN groupadd --gid $APP_GID $APP_GROUP && \
       --uid $APP_UID \
       $APP_USER
 
-RUN apt-get update && \
-    apt-get install -y ca-certificates python3 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Don't buffer stdout and stderr as it breaks realtime logging
-ENV PYTHONUNBUFFERED=1
-
-# Make httpx use the system trust roots
-# By default, this means we use the CAs from the ca-certificates package
-ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-
 # Tell Helm to use /tmp for mutable data
 ENV HELM_CACHE_HOME=/tmp/helm/cache
 ENV HELM_CONFIG_HOME=/tmp/helm/config
 ENV HELM_DATA_HOME=/tmp/helm/data
 
+### COPY IN APP ###
+# Files copied in must have their modes set so the nonroot user may read them.
+# You cannot do it here, chmod does not exist, and the docker flag doesn't work with podman yet.
+# Should be ordered the same as the stages are created above, to allow the parallel build to keep up.
+COPY --from=build /python /python
+COPY --from=build /app /app
+
 COPY --from=helm /usr/bin/helm /usr/bin/helm
-COPY --from=python-builder /venv /venv
 
 USER $APP_UID
-CMD ["/venv/bin/kopf", "run", "--module", "capi_addons.operator", "--all-namespaces", "--verbose"]
+CMD ["/app/bin/kopf", "run", "--module", "capi_addons.operator", "--all-namespaces", "--verbose"]
