@@ -1,8 +1,0 @@
-ruff~=0.16.1
-coverage!=4.4,>=7.15.3 # Apache-2.0
-stestr>=4.2.1 # Apache-2.0
-codespell
-types-PyYAML
-types-setuptools
-mypy
-black~=26.5.1
