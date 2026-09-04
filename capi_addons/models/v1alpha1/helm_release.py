@@ -5,7 +5,7 @@ import typing as t
 
 from easykube.kubernetes.client import AsyncClient
 from kube_custom_resource import schema
-from pydantic import Field
+from pydantic import AnyUrl, Field
 from pyhelm3 import Client
 
 from capi_addons.template import Loader
@@ -25,8 +25,11 @@ class HelmChart(schema.BaseModel):
     Specification for the chart to use.
     """
 
-    repo: schema.AnyHttpUrl = Field(
-        ..., description="The Helm repository that the chart is in."
+    repo: schema.Optional[AnyUrl] = Field(
+        None, description="The Helm repository that the chart is in."
+    )
+    ociRef: schema.Optional[AnyUrl] = Field(  # noqa: N815
+        None, description="OCI reference for the chart."
     )
     name: schema.constr(pattern=r"^[a-z0-9-]+$") = Field(
         ..., description="The name of the chart."
@@ -226,6 +229,10 @@ class HelmRelease(
         ..., description="The specification for the Helm release."
     )
 
+    @property
+    def is_oci(self):
+        return self.spec.chart.ociRef is not None
+
     def list_configmaps(self):
         return [
             source.config_map.name
@@ -249,6 +256,15 @@ class HelmRelease(
         infra_cluster: dict[str, t.Any],
         cloud_identity: dict[str, t.Any] | None,
     ) -> contextlib.AbstractAsyncContextManager[pathlib.Path]:
+        print(f"{self.spec.chart.name} is {self.spec.chart}")
+        print(type(self.spec.chart))
+        print(f"{self.spec.chart.name} IS OCI {self.is_oci}")
+        if self.is_oci:
+            return helm_client.pull_chart(
+                self.spec.chart.ociRef,
+                version=self.spec.chart.version,
+            )
+
         return helm_client.pull_chart(
             self.spec.chart.name,
             repo=self.spec.chart.repo,
