@@ -5,6 +5,13 @@ Please check for relevant issues and PRs before opening a new one of your own.
 
 ## Making a contribution
 
+### Running integration tests
+
+When raising a PR from a forked repository integration tests cannot run in the
+cloud without the necessary credentials. After initial review a contributor will
+merge the branch into a feature branch inside the repository and then raise a PR
+to `main` and run the integration tests.
+
 ### Helm template snapshots
 
 The CI in this repository uses the Helm
