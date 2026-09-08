@@ -1,13 +1,8 @@
 name: Integration tests
 
 on:
-  # We use pull_request_target so that dependabot-created workflows can run
-  pull_request_target:
-    types:
-      - opened
-      - synchronize
-      - ready_for_review
-      - reopened
+  # We use pull_request so that only PRs from our org can run
+  pull_request:
     branches:
       - main
 
@@ -25,20 +20,12 @@ concurrency:
 # TODO(mkjpryor): Change this in the future to use the CAPI management only variation
 #####
 jobs:
-  # This job exists so that PRs from outside the main repo are rejected
-  fail_on_remote:
-    runs-on: ubuntu-latest
-    steps:
-      - name: PR must be from a branch in the azimuth-cloud/cluster-api-addon-provider repo
-        run: exit ${{ github.event.pull_request.head.repo.full_name == 'azimuth-cloud/cluster-api-addon-provider' && '0' || '1' }}
-
   publish_artifacts:
     permissions:
       contents: write
       id-token: write         # needed for signing the images with GitHub OIDC Token
       packages: write         # required for pushing container images
       security-events: write  # required for pushing SARIF files
-    needs: [fail_on_remote]
     uses: ./.github/workflows/build-push-artifacts.yaml
     with:
       ref: ${{ github.event.pull_request.head.sha }}
