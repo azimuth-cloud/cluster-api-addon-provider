@@ -108,4 +108,4 @@ COPY --from=build /app /app
 COPY --from=helm /usr/bin/helm /usr/bin/helm
 
 USER $APP_UID
-CMD ["/app/bin/kopf", "run", "--module", "capi_addons.operator", "--all-namespaces", "--verbose"]
+ENTRYPOINT ["/app/bin/kopf", "run", "--module", "capi_addons.operator", "--all-namespaces"]
