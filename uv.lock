@@ -251,7 +251,7 @@ requires-dist = [
     { name = "kopf", specifier = ">=1.44.6" },
     { name = "kube-custom-resource", specifier = ">=0.6.1" },
     { name = "pydantic", specifier = ">=2.13.5" },
-    { name = "pyhelm3", specifier = ">=0.5.5" },
+    { name = "pyhelm3", specifier = ">=0.5.6" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
@@ -1067,16 +1067,16 @@ wheels = [
 
 [[package]]
 name = "pyhelm3"
-version = "0.5.5"
+version = "0.5.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ac/6e/5ee724e1a9f5851a59f1263052799d0e49a6ccc8997264f8029da3df07ad/pyhelm3-0.5.5.tar.gz", hash = "sha256:0614e41972f7aac0e578a17da9b853ac1aa6e0e35944602af37167339f5acd7d", size = 20529, upload-time = "2026-09-04T09:28:30.855Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/57/a5/3ef9a5d4e790974e049791c179d46b34462fd781d925a611965b2b290418/pyhelm3-0.5.6.tar.gz", hash = "sha256:490c599c07820db969d3dc348281c51d8267d7c7bb2ab7a228b1233bfbedbb28", size = 21270, upload-time = "2026-09-09T13:23:24.953Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/ec/4487bc872100e23435176bf09da0873fea06d6dd98b7aca2c7d87bda16ac/pyhelm3-0.5.5-py3-none-any.whl", hash = "sha256:63eb10653f844451c55067f29b53976c4d834116921b981a96a4d26d3fa05366", size = 22087, upload-time = "2026-09-04T09:28:29.672Z" },
+    { url = "https://files.pythonhosted.org/packages/54/bc/a90887ad9917f9fe44e7e3091716c3d218314946d5faa29406f094b85292/pyhelm3-0.5.6-py3-none-any.whl", hash = "sha256:73458c5289f4fd8ad9bec6685461db0c97d9d8033ac59bd5a4a62007fac5e2f6", size = 22163, upload-time = "2026-09-09T13:23:23.643Z" },
 ]
 
 [[package]]
