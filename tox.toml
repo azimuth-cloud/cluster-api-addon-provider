@@ -1,0 +1,55 @@
+min_version = "4.0.0"
+env_list = ["py312", "black", "ruff", "codespell", "autofix", "cover"]
+
+# We run autofix last, to ensure CI fails,
+# even though we do our best to autofix locally
+skip_missing_interpreters = true
+
+# TODO: fix mypy and add above
+
+[env_run_base]
+runner = "uv-venv-lock-runner"
+package = "skip"
+usedevelop = true
+
+set_env = { PYTHONWARNINGS = "default::DeprecationWarning", OS_STDOUT_CAPTURE = "1", OS_STDERR_CAPTURE = "1", OS_TEST_TIMEOUT = "60" }
+
+[env.autofix]
+commands = [
+    ["codespell", "{tox_root}/capi_addons", "-w"],
+    ["ruff", "format", "{tox_root}"],
+    ["ruff", "check", "{tox_root}", "--fix"],
+]
+
+[env.black]
+# TODO: understand why ruff doesn't fix
+# line lengths as well as black does
+commands = [
+    ["black", "{tox_root}/"]
+]
+
+[env.codespell]
+commands = [
+  ["codespell", "{tox_root}/capi_addons"],
+]
+
+[env.ruff]
+description = "Run Ruff checks"
+commands = [
+    ["ruff", "check", "{tox_root}"],
+    ["ruff", "format", "{tox_root}", "--check"],
+]
+
+[env.venv]
+commands = ["{posargs}"]
+
+[env.cover]
+commands = [
+    ["pytest", "--cov","capi_addons"],
+    ["coverage", "html", "-d", "cover"],
+    ["coverage", "xml", "-o", "cover/coverage.xml"],
+    ["coverage", "report"],
+]
+
+[env.mypy]
+commands = [["mypy", "{tox_root}", "{posargs}"]]
