@@ -144,7 +144,12 @@ templated manifests should match snapshot:
             - image: ghcr.io/azimuth-cloud/cluster-api-addon-provider:main
               imagePullPolicy: IfNotPresent
               name: cluster-api-addon-provider
-              resources: {}
+              resources:
+                limits:
+                  memory: 512Mi
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
               securityContext:
                 allowPrivilegeEscalation: false
                 capabilities:

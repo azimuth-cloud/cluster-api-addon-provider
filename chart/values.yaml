@@ -26,7 +26,16 @@ securityContext:
   readOnlyRootFilesystem: true
 
 # Resources for the operator container
-resources: {}
+# The operator is a single-replica kopf controller that shells out to the Helm
+# CLI, producing transient CPU/memory spikes during reconciliation. Requests
+# cover the steady-state baseline; a memory limit guards against runaway usage,
+# while no CPU limit is set to avoid throttling reconciliation bursts.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
 
 # Scheduling parameters for the operator pod
 nodeSelector: {}
