@@ -93,6 +93,14 @@ RUN groupadd --gid $APP_GID $APP_GROUP && \
       --uid $APP_UID \
       $APP_USER
 
+RUN apt-get update && \
+    apt-get install -y ca-certificates python3 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Make httpx use the system trust roots
+# By default, this means we use the CAs from the ca-certificates package
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
 # Tell Helm to use /tmp for mutable data
 ENV HELM_CACHE_HOME=/tmp/helm/cache
 ENV HELM_CONFIG_HOME=/tmp/helm/config
