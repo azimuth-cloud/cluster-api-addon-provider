@@ -10,7 +10,7 @@ trustBundle:
 image:
   repository: ghcr.io/azimuth-cloud/cluster-api-addon-provider
   pullPolicy: IfNotPresent
-  tag: "" # Defaults to appVersion
+  tag: ""  # Defaults to appVersion
 
 imagePullSecrets: []
 
