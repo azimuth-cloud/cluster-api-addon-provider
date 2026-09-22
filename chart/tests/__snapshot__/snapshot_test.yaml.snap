@@ -146,7 +146,7 @@ templated manifests should match snapshot:
               name: cluster-api-addon-provider
               resources:
                 limits:
-                  memory: 512Mi
+                  memory: 2Gi
                 requests:
                   cpu: 100m
                   memory: 256Mi
