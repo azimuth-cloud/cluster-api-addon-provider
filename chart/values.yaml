@@ -10,7 +10,7 @@ trustBundle:
 image:
   repository: ghcr.io/azimuth-cloud/cluster-api-addon-provider
   pullPolicy: IfNotPresent
-  tag: ""  # Defaults to appVersion
+  tag: "" # Defaults to appVersion
 
 imagePullSecrets: []
 
@@ -35,7 +35,9 @@ resources:
     cpu: 100m
     memory: 256Mi
   limits:
-    memory: 512Mi
+    # Note that the memory usage of the spawned helm processes are included in this limit,
+    # and quite a few can run helm install concurrently
+    memory: 2Gi
 
 # Scheduling parameters for the operator pod
 nodeSelector: {}
