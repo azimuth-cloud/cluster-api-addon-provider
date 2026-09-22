@@ -1,5 +1,6 @@
 # cluster-api-addon-provider
 
+
 The Cluster API addon provider is a
 [Kubernetes operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 that provides
@@ -51,15 +52,15 @@ Templates use the [Jinja2](https://jinja.palletsprojects.com/en/3.1.x/templates/
 
 Templates have access to the following variables:
 
-  * `addon`  
+  * `addon`
     The addon object itself (e.g. the `HelmRelease` or `Manifests` object).
-  * `cluster`  
+  * `cluster`
     The target Cluster API cluster object.
-  * `infra_cluster`  
+  * `infra_cluster`
     The infrastructure cluster for the target Cluster API cluster (i.e. the object referenced
     in the `spec.infrastructureRef` field of the cluster). The `kind` of the object depends on
     the infrastructure provider that is being used.
-  * `cloud_identity`  
+  * `cloud_identity`
     The identity object for the infrastructure cluster, if one exists (i.e. the object referenced
     in the `spec.identityRef` field of the infrastructure cluster). The `kind` of the object, and
     whether it exists at all, depends on the infrastructure provider in use. In some cases, it is
@@ -70,15 +71,15 @@ Templates have access to the following variables:
 The following custom filters are also made available to templates in addition to the
 [Jinja2 builtin filters](https://jinja.palletsprojects.com/en/3.1.x/templates/#builtin-filters):
 
-  * `mergeconcat`  
+  * `mergeconcat`
     Recursively merges two or more dictionaries, with lists being concatenated.
-  * `fromyaml`  
+  * `fromyaml`
     Parses a YAML document into an object.
-  * `toyaml`  
+  * `toyaml`
     Renders the given Python object as YAML.
-  * `b64encode`  
+  * `b64encode`
     Encodes the given value as base64, e.g. for secret data.
-  * `b64decode`  
+  * `b64decode`
     Decodes the given base64-encoded data and returns a UTF-8 string.
 
 ## HelmRelease
