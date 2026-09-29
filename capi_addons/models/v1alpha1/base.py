@@ -617,6 +617,8 @@ class Addon(CustomResource, abstract=True):
                     # Always reset to the values from the chart then apply
                     # our changes on top
                     reset_values=True,
+                    force_conflicts=True,
+                    server_side="true",
                     timeout=self.spec.release_timeout,
                     wait=True,
                 )
