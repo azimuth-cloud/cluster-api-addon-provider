@@ -28,7 +28,7 @@ class HelmChart(schema.BaseModel):
     repo: schema.AnyHttpUrl = Field(
         ..., description="The Helm repository that the chart is in."
     )
-    name: schema.constr(pattern=r"^[a-z0-9-]+$") = Field(
+    name: schema.constr(pattern=r"^[a-zA-Z0-9._-]+$") = Field(
         ..., description="The name of the chart."
     )
     version: schema.constr(pattern=SEMVER_PATTERN) = Field(
