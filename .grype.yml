@@ -8,4 +8,13 @@ ignore:
   - vulnerability: CVE-2026-27143
     package:
       location: "/usr/bin/helm"
-
+  # Only affects Windows systems
+  - vulnerability: GO-2026-6604
+    package:
+      location: "/usr/bin/helm"
+  # Only affects Go code running as a server and even if connection flow rates
+  # are exceeded the stream level rates and buffer still apply. Not considered
+  # critical
+  - vulnerability: GO-2026-6612
+    package:
+      location: "/usr/bin/helm"
