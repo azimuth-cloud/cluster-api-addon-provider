@@ -38,6 +38,10 @@ exclude = [
     "/uv.lock",
 ]
 
+[tool.uv]
+exclude-newer = "7 days"
+exclude-newer-package = { certifi = false }
+
 [tool.black]
 line-length = 88
 target-version = ["py310"]
