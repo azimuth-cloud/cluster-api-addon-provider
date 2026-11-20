@@ -354,6 +354,24 @@ async def handle_addon_updated(addon, logger, **kwargs):
             raise kopf.PermanentError(str(exc))
 
 
+async def until_cluster_deleted(resource, cluster):
+    """
+    Wait until the cluster starts deleting or no longer exists
+    """
+    while True:
+        try:
+            current = await resource.fetch(
+                cluster.metadata.name, namespace=cluster.metadata.namespace
+            )
+        except ApiError as exc:
+            if exc.status_code == 404:
+                return
+            raise
+        if current.metadata.get("deletionTimestamp"):
+            return
+        await asyncio.sleep(5)
+
+
 @addon_handler(kopf.on.delete)
 async def handle_addon_deleted(addon, logger, **kwargs):
     """
@@ -374,7 +392,7 @@ async def handle_addon_deleted(addon, logger, **kwargs):
                 raise
         else:
             # If the cluster is deleting, there is nothing for us to do
-            if cluster.status.phase == "Deleting":
+            if cluster.metadata.get("deletionTimestamp"):
                 return
         try:
             secret = await k8s.Secret(ek_client).fetch(
@@ -393,7 +411,26 @@ async def handle_addon_deleted(addon, logger, **kwargs):
             return
         async with clients_for_cluster(secret) as (ek_client_target, helm_client):
             try:
-                await addon.uninstall(ek_client, ek_client_target, helm_client)
+                # uninstall hooks cannot finish when workload cluster is gone
+                uninstall_task = asyncio.create_task(
+                    addon.uninstall(ek_client, ek_client_target, helm_client)
+                )
+                wait_for_delete_task = asyncio.create_task(
+                    until_cluster_deleted(resource, cluster)
+                )
+                tasks = {uninstall_task, wait_for_delete_task}
+                try:
+                    done, _ = await asyncio.wait(
+                        tasks, return_when=asyncio.FIRST_COMPLETED
+                    )
+                    for task in done:
+                        await task
+                finally:
+                    # it also stop both tasks if the handler itself is cancelled
+                    for task in tasks:
+                        if not task.done():
+                            task.cancel()
+                    await asyncio.gather(*tasks, return_exceptions=True)
             except ApiError as exc:
                 if exc.status_code == 409:
                     raise kopf.TemporaryError(
